@@ -50,7 +50,7 @@ if(!isDev){
                 loggerAutoUpdaterSuccess.log('Nouvelle mise à jour disponible', info.version)
                 
                 if(process.platform === 'darwin'){
-                    info.darwindownload = `https://github.com/LucasB25/HuntingZ_Launcher/releases/download/v${info.version}/Launcher HuntingZ-setup-${info.version}${process.arch === 'arm64' ? '-arm64' : '-x64'}.dmg`
+                    info.darwindownload = `https://github.com/LucasB25/HuntingZ_Launcher/releases/download/v${info.version}/Launcher-HuntingZ-setup-${info.version}${process.arch === 'arm64' ? '-arm64' : '-x64'}.dmg`
                     showUpdateUI(info)
                 }
                 
