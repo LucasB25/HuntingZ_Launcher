@@ -44,10 +44,10 @@ if(!isDev){
         switch(arg){
             case 'checking-for-update':
                 loggerAutoUpdater.log('Checking for update..')
-                settingsUpdateButtonStatus('Vérification des mises à jour..', true)
+                settingsUpdateButtonStatus('Checking for Updates..', true)
                 break
             case 'update-available':
-                loggerAutoUpdaterSuccess.log('Nouvelle mise à jour disponible', info.version)
+                loggerAutoUpdaterSuccess.log('New update available', info.version)
                 
                 if(process.platform === 'darwin'){
                     info.darwindownload = `https://github.com/LucasB25/HuntingZ_Launcher/releases/download/v${info.version}/Launcher-HuntingZ-setup-${info.version}${process.arch === 'arm64' ? '-arm64' : '-x64'}.dmg`
@@ -58,7 +58,7 @@ if(!isDev){
                 break
             case 'update-downloaded':
                 loggerAutoUpdaterSuccess.log('Update ' + info.version + ' ready to be installed.')
-                settingsUpdateButtonStatus('Installer maintenant', false, () => {
+                settingsUpdateButtonStatus('Install Now', false, () => {
                     if(!isDev){
                         ipcRenderer.send('autoUpdateAction', 'installUpdateNow')
                     }
@@ -67,7 +67,7 @@ if(!isDev){
                 break
             case 'update-not-available':
                 loggerAutoUpdater.log('No new update found.')
-                settingsUpdateButtonStatus('Aucune mise à jour disponible.')
+                settingsUpdateButtonStatus('Check for Updates')
                 break
             case 'ready':
                 updateCheckListener = setInterval(() => {
@@ -155,6 +155,15 @@ document.addEventListener('readystatechange', function () {
                 } else {
                     window.maximize()
                 }
+                document.activeElement.blur()
+            })
+        })
+
+        // Bind minimize button.
+        Array.from(document.getElementsByClassName('fMb')).map((val) => {
+            val.addEventListener('click', e => {
+                const window = remote.getCurrentWindow()
+                window.minimize()
                 document.activeElement.blur()
             })
         })
