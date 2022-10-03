@@ -1,9 +1,14 @@
 {
   "name": "huntingzlauncher",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "productName": "HuntingZ Launcher",
-  "description": "Modded Minecraft Launcher for HuntingZ",
+  "description": "Modded Minecraft Launcher",
+  "author": "LucasB25 (https://github.com/LucasB25/)",
   "license": "UNLICENSED",
+  "homepage": "https://github.com/LucasB25/HuntingZ_Launcher",
+  "bugs": {
+    "url": "https://github.com/LucasB25/HuntingZ_Launcher/issues"
+  },
   "private": true,
   "main": "index.js",
   "scripts": {
@@ -24,23 +29,25 @@
     "discord-rpc-patch": "^4.0.1",
     "ejs": "^3.1.8",
     "ejs-electron": "^2.1.1",
-    "electron-updater": "^5.0.5",
+    "electron-updater": "^5.2.3",
     "fs-extra": "^10.1.0",
     "github-syntax-dark": "^0.5.0",
     "got": "^11.8.5",
-    "helios-core": "~0.1.0",
-    "jquery": "^3.6.0",
-    "node-machine-id": "^1.1.12",
+    "helios-core": "~0.1.1",
+    "jquery": "^3.6.1",
     "node-stream-zip": "^1.15.0",
     "request": "^2.88.2",
     "semver": "^7.3.7",
     "tar-fs": "^2.1.1",
-    "winreg": "^1.2.4",
-    "uuid": "^8.3.2"
+    "winreg": "^1.2.4"
   },
   "devDependencies": {
-    "electron": "^19.0.10",
-    "electron-builder": "^23.1.0",
-    "eslint": "^8.20.0"
+    "electron": "^20.1.1",
+    "electron-builder": "^23.3.3",
+    "eslint": "^8.23.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/LucasB25/HuntingZ_Launcher.git"
   }
 }
