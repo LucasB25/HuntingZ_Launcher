@@ -1,6 +1,6 @@
 {
   "name": "huntingzlauncher",
-  "version": "1.0.0",
+  "version": "1.0.5",
   "productName": "HuntingZ Launcher",
   "description": "Modded Minecraft Launcher",
   "author": "LucasB25 (https://github.com/LucasB25/)",
@@ -29,22 +29,24 @@
     "discord-rpc-patch": "^4.0.1",
     "ejs": "^3.1.8",
     "ejs-electron": "^2.1.1",
-    "electron-updater": "^5.2.3",
+    "electron-updater": "^5.0.5",
     "fs-extra": "^10.1.0",
     "github-syntax-dark": "^0.5.0",
     "got": "^11.8.5",
     "helios-core": "~0.1.1",
     "jquery": "^3.6.1",
+    "node-machine-id": "^1.1.12",
     "node-stream-zip": "^1.15.0",
     "request": "^2.88.2",
     "semver": "^7.3.7",
     "tar-fs": "^2.1.1",
-    "winreg": "^1.2.4"
+    "winreg": "^1.2.4",
+    "uuid": "^8.3.2"
   },
   "devDependencies": {
-    "electron": "^20.1.1",
-    "electron-builder": "^23.3.3",
-    "eslint": "^8.23.0"
+    "electron": "^19.0.10",
+    "electron-builder": "^23.1.0",
+    "eslint": "^8.20.0"
   },
   "repository": {
     "type": "git",
