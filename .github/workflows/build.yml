@@ -31,5 +31,6 @@ jobs:
       - name: Build
         env:
           GH_TOKEN: ${{ secrets.github_token }}
+          release: ${{ startsWith(github.ref, 'refs/tags/v') }}
         run: npm run dist
         shell: bash
