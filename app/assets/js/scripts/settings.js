@@ -1408,7 +1408,7 @@ function populateAboutVersionInformation(){
  */
 function populateReleaseNotes(){
     $.ajax({
-        url: 'https://github.com/lucasb25/huntingz/releases.atom', //Pomme
+        url: 'https://github.com/LucasB25/HuntingZ_Launcher/releases', //Pomme
         success: (data) => {
             const version = 'v' + remote.app.getVersion()
             const entries = $(data).find('entry')
