@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom" xmlns:media="http://search.yahoo.com/mrss/" xml:lang="en-US">
+  <id>tag:github.com,2008:https://github.com/LucasB25/HuntingZ_Launcher/releases</id>
+  <link type="text/html" rel="alternate" href="https://github.com/Creat789/launcher/releases"/>
+  <link type="application/atom+xml" rel="self" href="https://github.com/Creat789/launcher/releases.atom"/>
+  <title>Release notes from HuntingZ Launcher</title>
+  <updated>2022-01-09T19:42:34+02:00</updated>
+  <entry>
+    <id>tag:github.com,2008:Repository/118847892/v1.0.0</id>
+    <updated>2022-01-09T19:54:07+02:00</updated>
+    <link rel="alternate" type="text/html" href="https://github.com/LucasB25/HuntingZ_Launcher/releases/tag/v1.0.0"/>
+    <title>Release v1.0.0 - 2022 Maintenance and Fixes</title>
+    <content type="html">LOL</content>
+    <author>
+      <name>LucasB25</name>
+    </author>
+    <media:thumbnail height="30" width="30" url="https://avatars.githubusercontent.com/u/9703873?s=60&amp;v=4"/>
+  </entry>
+</feed>
