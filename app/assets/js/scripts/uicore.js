@@ -98,7 +98,7 @@ if(!isDev){
  * Send a notification to the main process changing the value of
  * allowPrerelease. If we are running a prerelease version, then
  * this will always be set to true, regardless of the current value
- * of val.
+ * of val. (:)
  * 
  * @param {boolean} val The new allow prerelease value.
  */
