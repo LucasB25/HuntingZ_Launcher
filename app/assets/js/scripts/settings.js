@@ -1486,7 +1486,7 @@ function populateSettingsUpdateInformation(data){
                 shell.openExternal(data.darwindownload)
             })
         } else {
-            settingsUpdateButtonStatus('Téléchargement...', true)
+            settingsUpdateButtonStatus('Téléchargement..', true)
         }
     } else {
         settingsUpdateTitle.innerHTML = 'Vous utilisez la dernière version'
@@ -1495,7 +1495,7 @@ function populateSettingsUpdateInformation(data){
         settingsUpdateButtonStatus('Vérifier les mises à jour', false, () => {
             if(!isDev){
                 ipcRenderer.send('autoUpdateAction', 'checkForUpdate')
-                settingsUpdateButtonStatus('Vérification des mises à jour...', true)
+                settingsUpdateButtonStatus('Vérification des mises à jour..', true)
             }
         })
     }
