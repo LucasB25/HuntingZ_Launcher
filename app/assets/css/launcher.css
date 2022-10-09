@@ -2893,6 +2893,17 @@ input:checked + .toggleSwitchSlider:before {
     font-family: 'sans-serif';
 }
 
+#frameButtonDarwin_minimize {
+    background-color: #fed045;
+}
+#frameButtonDarwin_minimize:hover,
+#frameButtonDarwin_minimize:focus {
+    background-color: #FFE9A9;
+}
+#frameButtonDarwin_minimize:active {
+    background-color: #ffde7b;
+}
+
 /* Tooltip which displays more details about the mojang statuses. */
 #mojangStatusTooltip {
     position: absolute;

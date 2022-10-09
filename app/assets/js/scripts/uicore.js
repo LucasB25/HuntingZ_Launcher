@@ -145,16 +145,12 @@ document.addEventListener('readystatechange', function () {
                 window.close()
             })
         })
-
-        // Bind restore down button.
-        Array.from(document.getElementsByClassName('fRb')).map((val) => {
+        
+        // Bind minimize button.
+        Array.from(document.getElementsByClassName('fMb')).map((val) => {
             val.addEventListener('click', e => {
                 const window = remote.getCurrentWindow()
-                if(window.isMaximized()){
-                    window.unmaximize()
-                } else {
-                    window.maximize()
-                }
+                window.minimize()
                 document.activeElement.blur()
             })
         })

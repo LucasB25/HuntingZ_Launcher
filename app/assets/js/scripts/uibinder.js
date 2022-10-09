@@ -323,10 +323,10 @@ async function validateSelectedAccount(){
             ConfigManager.save()
             const accLen = Object.keys(ConfigManager.getAuthAccounts()).length
             setOverlayContent(
-                'Failed to Refresh Login',
-                `We were unable to refresh the login for <strong>${selectedAcc.displayName}</strong>. Please ${accLen > 0 ? 'select another account or ' : ''} login again.`,
-                'Login',
-                'Select Another Account'
+                'Échec d’actualisation de la connexion',
+                `Nous n’avons pas pu actualiser l’ouverture de session pour <strong>${selectedAcc.displayName}</strong>. Veuillez ${accLen > 0 ? 'sélectionner un autre compte ou ' : ''} vous reconnecter.`,
+                'Connexion',
+                'sélectionner un autre compte'
             )
             setOverlayHandler(() => {
 

@@ -354,8 +354,8 @@ ipcRenderer.on(MSFT_OPCODE.REPLY_LOGIN, (_, ...arguments_) => {
 
             // Unexpected error.
             setOverlayContent(
-                'Something Went Wrong',
-                'Microsoft authentication failed. Please try again.',
+                'Quelque chose a mal tourné',
+                'L’authentification Microsoft a échoué. Veuillez réessayer.',
                 'OK'
             )
             setOverlayHandler(() => {
@@ -410,8 +410,8 @@ ipcRenderer.on(MSFT_OPCODE.REPLY_LOGIN, (_, ...arguments_) => {
                         // Uh oh.
                         msftLoginLogger.error('Unhandled error during login.', displayableError)
                         actualDisplayableError = {
-                            title: 'Unknown Error During Login',
-                            desc: 'An unknown error has occurred. Please see the console for details.'
+                            title: 'Erreur inconnue lors de la connexion',
+                            desc: 'Une erreur inconnue s’est produite. Veuillez consulter la console pour plus de détails.'
                         }
                     }
 
@@ -463,9 +463,9 @@ function bindAuthAccountLogOut(){
             if(Object.keys(ConfigManager.getAuthAccounts()).length === 1){
                 isLastAccount = true
                 setOverlayContent(
-                    'Warning<br>This is Your Last Account',
-                    'In order to use the launcher you must be logged into at least one account. You will need to login again after.<br><br>Are you sure you want to log out?',
-                    'I\'m Sure',
+                    'Avertissement<br>Ceci est votre dernier compte',
+                    'Pour utiliser le launcher, vous devez être connecté à au moins un compte. Vous devrez vous reconnecter après. <br><br>Voulez-vous vraiment vous déconnecter ?',
+                    'Je suis sûr',
                     'Annuler'
                 )
                 setOverlayHandler(() => {
@@ -535,8 +535,8 @@ ipcRenderer.on(MSFT_OPCODE.REPLY_LOGOUT, (_, ...arguments_) => {
 
             // Unexpected error.
             setOverlayContent(
-                'Something Went Wrong',
-                'Microsoft logout failed. Please try again.',
+                'Quelque chose a mal tourné',
+                'La déconnexion de Microsoft a échoué. Veuillez réessayer.',
                 'OK'
             )
             setOverlayHandler(() => {
@@ -881,9 +881,9 @@ function bindDropinModsRemoveButton(){
                 document.getElementById(fullName).remove()
             } else {
                 setOverlayContent(
-                    `Failed to Delete<br>Drop-in Mod ${fullName}`,
-                    'Make sure the file is not in use and try again.',
-                    'Okay'
+                    `Échec de la suppression<br>du module intégré ${fullName}`,
+                    'Assurez-vous que le fichier n’est pas utilisé et réessayez.',
+                    'Ok'
                 )
                 setOverlayHandler(null)
                 toggleOverlay(true)
@@ -936,7 +936,7 @@ function saveDropinModConfiguration(){
                 DropinModUtil.toggleDropinMod(CACHE_SETTINGS_MODS_DIR, dropin.fullName, dropinUIEnabled).catch(err => {
                     if(!isOverlayVisible()){
                         setOverlayContent(
-                            'Failed to Toggle<br>One or More Drop-in Mods',
+                            'Echec de basculement<br>Un ou plusieurs modules déroulants',
                             err.message,
                             'Okay'
                         )
