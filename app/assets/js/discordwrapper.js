@@ -21,8 +21,6 @@ exports.initRPC = function (
     state: "Serveur Minecraft Dayz",
     largeImageKey: servSettings.largeImageKey,
     largeImageText: servSettings.largeImageText,
-    smallImageKey: genSettings.smallImageKey,
-    smallImageText: genSettings.smallImageText,
     startTimestamp: new Date().getTime(),
     instance: false,
   };
