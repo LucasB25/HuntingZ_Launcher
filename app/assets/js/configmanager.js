@@ -66,14 +66,14 @@ exports.getAbsoluteMaxRAM = function () {
   return Math.floor(
     (mem -
       1000000000 -
-      (gT16 > 0 ? Number.parseInt(gT16 / 8) + 16000000000 / 4 : mem / 4)) /
+      (gT16 > 0 ? Number.parseInt(gT16 / 8) + 16000000000 / 2 : mem / 2)) /
       1000000000
   );
 };
 
 function resolveMaxRAM() {
   const mem = os.totalmem();
-  return mem >= 8000000000 ? "4G" : mem >= 6000000000 ? "3G" : "2G";
+  return mem >= 8000000000 ? "2G" : mem >= 6000000000 ? "3G" : "2G";
 }
 
 function resolveMinRAM() {
