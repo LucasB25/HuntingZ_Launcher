@@ -1,454 +1,479 @@
 // Requirements
-const os     = require('os')
-const semver = require('semver')
+const os = require("os");
+const semver = require("semver");
 
-const { JavaGuard } = require('./assets/js/assetguard')
-const DropinModUtil  = require('./assets/js/dropinmodutil')
-const { MSFT_OPCODE, MSFT_REPLY_TYPE, MSFT_ERROR } = require('./assets/js/ipcconstants')
+const { JavaGuard } = require("./assets/js/assetguard");
+const DropinModUtil = require("./assets/js/dropinmodutil");
+const {
+  MSFT_OPCODE,
+  MSFT_REPLY_TYPE,
+  MSFT_ERROR,
+} = require("./assets/js/ipcconstants");
 
 const settingsState = {
-    invalid: new Set()
+  invalid: new Set(),
+};
+
+function bindSettingsSelect() {
+  for (let ele of document.getElementsByClassName("settingsSelectContainer")) {
+    const selectedDiv = ele.getElementsByClassName("settingsSelectSelected")[0];
+
+    selectedDiv.onclick = (e) => {
+      e.stopPropagation();
+      closeSettingsSelect(e.target);
+      e.target.nextElementSibling.toggleAttribute("hidden");
+      e.target.classList.toggle("select-arrow-active");
+    };
+  }
 }
 
-function bindSettingsSelect(){
-    for(let ele of document.getElementsByClassName('settingsSelectContainer')) {
-        const selectedDiv = ele.getElementsByClassName('settingsSelectSelected')[0]
+function closeSettingsSelect(el) {
+  for (let ele of document.getElementsByClassName("settingsSelectContainer")) {
+    const selectedDiv = ele.getElementsByClassName("settingsSelectSelected")[0];
+    const optionsDiv = ele.getElementsByClassName("settingsSelectOptions")[0];
 
-        selectedDiv.onclick = (e) => {
-            e.stopPropagation()
-            closeSettingsSelect(e.target)
-            e.target.nextElementSibling.toggleAttribute('hidden')
-            e.target.classList.toggle('select-arrow-active')
-        }
+    if (!(selectedDiv === el)) {
+      selectedDiv.classList.remove("select-arrow-active");
+      optionsDiv.setAttribute("hidden", "");
     }
-}
-
-function closeSettingsSelect(el){
-    for(let ele of document.getElementsByClassName('settingsSelectContainer')) {
-        const selectedDiv = ele.getElementsByClassName('settingsSelectSelected')[0]
-        const optionsDiv = ele.getElementsByClassName('settingsSelectOptions')[0]
-
-        if(!(selectedDiv === el)) {
-            selectedDiv.classList.remove('select-arrow-active')
-            optionsDiv.setAttribute('hidden', '')
-        }
-    }
+  }
 }
 
 /* If the user clicks anywhere outside the select box,
 then close all select boxes: */
-document.addEventListener('click', closeSettingsSelect)
+document.addEventListener("click", closeSettingsSelect);
 
-bindSettingsSelect()
+bindSettingsSelect();
 
+function bindFileSelectors() {
+  for (let ele of document.getElementsByClassName("settingsFileSelButton")) {
+    ele.onclick = async (e) => {
+      const isJavaExecSel = ele.id === "settingsJavaExecSel";
+      const directoryDialog =
+        ele.hasAttribute("dialogDirectory") &&
+        ele.getAttribute("dialogDirectory") == "true";
+      const properties = directoryDialog
+        ? ["openDirectory", "createDirectory"]
+        : ["openFile"];
 
-function bindFileSelectors(){
-    for(let ele of document.getElementsByClassName('settingsFileSelButton')){
-        
-        ele.onclick = async e => {
-            const isJavaExecSel = ele.id === 'settingsJavaExecSel'
-            const directoryDialog = ele.hasAttribute('dialogDirectory') && ele.getAttribute('dialogDirectory') == 'true'
-            const properties = directoryDialog ? ['openDirectory', 'createDirectory'] : ['openFile']
+      const options = {
+        properties,
+      };
 
-            const options = {
-                properties
-            }
+      if (ele.hasAttribute("dialogTitle")) {
+        options.title = ele.getAttribute("dialogTitle");
+      }
 
-            if(ele.hasAttribute('dialogTitle')) {
-                options.title = ele.getAttribute('dialogTitle')
-            }
+      if (isJavaExecSel && process.platform === "win32") {
+        options.filters = [
+          { name: "Executables", extensions: ["exe"] },
+          { name: "All Files", extensions: ["*"] },
+        ];
+      }
 
-            if(isJavaExecSel && process.platform === 'win32') {
-                options.filters = [
-                    { name: 'Executables', extensions: ['exe'] },
-                    { name: 'All Files', extensions: ['*'] }
-                ]
-            }
-
-            const res = await remote.dialog.showOpenDialog(remote.getCurrentWindow(), options)
-            if(!res.canceled) {
-                ele.previousElementSibling.value = res.filePaths[0]
-                if(isJavaExecSel) {
-                    populateJavaExecDetails(ele.previousElementSibling.value)
-                }
-            }
+      const res = await remote.dialog.showOpenDialog(
+        remote.getCurrentWindow(),
+        options
+      );
+      if (!res.canceled) {
+        ele.previousElementSibling.value = res.filePaths[0];
+        if (isJavaExecSel) {
+          populateJavaExecDetails(ele.previousElementSibling.value);
         }
-    }
+      }
+    };
+  }
 }
 
-bindFileSelectors()
-
+bindFileSelectors();
 
 /**
  * General Settings Functions
  */
 
 /**
-  * Bind value validators to the settings UI elements. These will
-  * validate against the criteria defined in the ConfigManager (if
-  * any). If the value is invalid, the UI will reflect this and saving
-  * will be disabled until the value is corrected. This is an automated
-  * process. More complex UI may need to be bound separately.
-  */
-function initSettingsValidators(){
-    const sEls = document.getElementById('settingsContainer').querySelectorAll('[cValue]')
-    Array.from(sEls).map((v, index, arr) => {
-        const vFn = ConfigManager['validate' + v.getAttribute('cValue')]
-        if(typeof vFn === 'function'){
-            if(v.tagName === 'INPUT'){
-                if(v.type === 'number' || v.type === 'text'){
-                    v.addEventListener('keyup', (e) => {
-                        const v = e.target
-                        if(!vFn(v.value)){
-                            settingsState.invalid.add(v.id)
-                            v.setAttribute('error', '')
-                            settingsSaveDisabled(true)
-                        } else {
-                            if(v.hasAttribute('error')){
-                                v.removeAttribute('error')
-                                settingsState.invalid.delete(v.id)
-                                if(settingsState.invalid.size === 0){
-                                    settingsSaveDisabled(false)
-                                }
-                            }
-                        }
-                    })
+ * Bind value validators to the settings UI elements. These will
+ * validate against the criteria defined in the ConfigManager (if
+ * any). If the value is invalid, the UI will reflect this and saving
+ * will be disabled until the value is corrected. This is an automated
+ * process. More complex UI may need to be bound separately.
+ */
+function initSettingsValidators() {
+  const sEls = document
+    .getElementById("settingsContainer")
+    .querySelectorAll("[cValue]");
+  Array.from(sEls).map((v, index, arr) => {
+    const vFn = ConfigManager["validate" + v.getAttribute("cValue")];
+    if (typeof vFn === "function") {
+      if (v.tagName === "INPUT") {
+        if (v.type === "number" || v.type === "text") {
+          v.addEventListener("keyup", (e) => {
+            const v = e.target;
+            if (!vFn(v.value)) {
+              settingsState.invalid.add(v.id);
+              v.setAttribute("error", "");
+              settingsSaveDisabled(true);
+            } else {
+              if (v.hasAttribute("error")) {
+                v.removeAttribute("error");
+                settingsState.invalid.delete(v.id);
+                if (settingsState.invalid.size === 0) {
+                  settingsSaveDisabled(false);
                 }
+              }
             }
+          });
         }
-
-    })
+      }
+    }
+  });
 }
 
 /**
  * Load configuration values onto the UI. This is an automated process.
  */
-function initSettingsValues(){
-    const sEls = document.getElementById('settingsContainer').querySelectorAll('[cValue]')
-    Array.from(sEls).map((v, index, arr) => {
-        const cVal = v.getAttribute('cValue')
-        const gFn = ConfigManager['get' + cVal]
-        if(typeof gFn === 'function'){
-            if(v.tagName === 'INPUT'){
-                if(v.type === 'number' || v.type === 'text'){
-                    // Special Conditions
-                    if(cVal === 'JavaExecutable'){
-                        populateJavaExecDetails(v.value)
-                        v.value = gFn()
-                    } else if (cVal === 'DataDirectory'){
-                        v.value = gFn()
-                    } else if(cVal === 'JVMOptions'){
-                        v.value = gFn().join(' ')
-                    } else {
-                        v.value = gFn()
-                    }
-                } else if(v.type === 'checkbox'){
-                    v.checked = gFn()
-                }
-            } else if(v.tagName === 'DIV'){
-                if(v.classList.contains('rangeSlider')){
-                    // Special Conditions
-                    if(cVal === 'MinRAM' || cVal === 'MaxRAM'){
-                        let val = gFn()
-                        if(val.endsWith('M')){
-                            val = Number(val.substring(0, val.length-1))/1000
-                        } else {
-                            val = Number.parseFloat(val)
-                        }
-
-                        v.setAttribute('value', val)
-                    } else {
-                        v.setAttribute('value', Number.parseFloat(gFn()))
-                    }
-                }
-            }
+function initSettingsValues() {
+  const sEls = document
+    .getElementById("settingsContainer")
+    .querySelectorAll("[cValue]");
+  Array.from(sEls).map((v, index, arr) => {
+    const cVal = v.getAttribute("cValue");
+    const gFn = ConfigManager["get" + cVal];
+    if (typeof gFn === "function") {
+      if (v.tagName === "INPUT") {
+        if (v.type === "number" || v.type === "text") {
+          // Special Conditions
+          if (cVal === "JavaExecutable") {
+            populateJavaExecDetails(v.value);
+            v.value = gFn();
+          } else if (cVal === "DataDirectory") {
+            v.value = gFn();
+          } else if (cVal === "JVMOptions") {
+            v.value = gFn().join(" ");
+          } else {
+            v.value = gFn();
+          }
+        } else if (v.type === "checkbox") {
+          v.checked = gFn();
         }
+      } else if (v.tagName === "DIV") {
+        if (v.classList.contains("rangeSlider")) {
+          // Special Conditions
+          if (cVal === "MinRAM" || cVal === "MaxRAM") {
+            let val = gFn();
+            if (val.endsWith("M")) {
+              val = Number(val.substring(0, val.length - 1)) / 1000;
+            } else {
+              val = Number.parseFloat(val);
+            }
 
-    })
+            v.setAttribute("value", val);
+          } else {
+            v.setAttribute("value", Number.parseFloat(gFn()));
+          }
+        }
+      }
+    }
+  });
 }
 
 /**
  * Save the settings values.
  */
-function saveSettingsValues(){
-    const sEls = document.getElementById('settingsContainer').querySelectorAll('[cValue]')
-    Array.from(sEls).map((v, index, arr) => {
-        const cVal = v.getAttribute('cValue')
-        const sFn = ConfigManager['set' + cVal]
-        if(typeof sFn === 'function'){
-            if(v.tagName === 'INPUT'){
-                if(v.type === 'number' || v.type === 'text'){
-                    // Special Conditions
-                    if(cVal === 'JVMOptions'){
-                        if(!v.value.trim()) {
-                            sFn([])
-                        } else {
-                            sFn(v.value.trim().split(/\s+/))
-                        }
-                    } else {
-                        sFn(v.value)
-                    }
-                } else if(v.type === 'checkbox'){
-                    sFn(v.checked)
-                    // Special Conditions
-                    if(cVal === 'AllowPrerelease'){
-                        changeAllowPrerelease(v.checked)
-                    }
-                }
-            } else if(v.tagName === 'DIV'){
-                if(v.classList.contains('rangeSlider')){
-                    // Special Conditions
-                    if(cVal === 'MinRAM' || cVal === 'MaxRAM'){
-                        let val = Number(v.getAttribute('value'))
-                        if(val%1 > 0){
-                            val = val*1000 + 'M'
-                        } else {
-                            val = val + 'G'
-                        }
-
-                        sFn(val)
-                    } else {
-                        sFn(v.getAttribute('value'))
-                    }
-                }
+function saveSettingsValues() {
+  const sEls = document
+    .getElementById("settingsContainer")
+    .querySelectorAll("[cValue]");
+  Array.from(sEls).map((v, index, arr) => {
+    const cVal = v.getAttribute("cValue");
+    const sFn = ConfigManager["set" + cVal];
+    if (typeof sFn === "function") {
+      if (v.tagName === "INPUT") {
+        if (v.type === "number" || v.type === "text") {
+          // Special Conditions
+          if (cVal === "JVMOptions") {
+            if (!v.value.trim()) {
+              sFn([]);
+            } else {
+              sFn(v.value.trim().split(/\s+/));
             }
+          } else {
+            sFn(v.value);
+          }
+        } else if (v.type === "checkbox") {
+          sFn(v.checked);
+          // Special Conditions
+          if (cVal === "AllowPrerelease") {
+            changeAllowPrerelease(v.checked);
+          }
         }
-    })
+      } else if (v.tagName === "DIV") {
+        if (v.classList.contains("rangeSlider")) {
+          // Special Conditions
+          if (cVal === "MinRAM" || cVal === "MaxRAM") {
+            let val = Number(v.getAttribute("value"));
+            if (val % 1 > 0) {
+              val = val * 1000 + "M";
+            } else {
+              val = val + "G";
+            }
+
+            sFn(val);
+          } else {
+            sFn(v.getAttribute("value"));
+          }
+        }
+      }
+    }
+  });
 }
 
-let selectedSettingsTab = 'settingsTabAccount'
+let selectedSettingsTab = "settingsTabAccount";
 
 /**
  * Modify the settings container UI when the scroll threshold reaches
  * a certain poin.
- * 
+ *
  * @param {UIEvent} e The scroll event.
  */
-function settingsTabScrollListener(e){
-    if(e.target.scrollTop > Number.parseFloat(getComputedStyle(e.target.firstElementChild).marginTop)){
-        document.getElementById('settingsContainer').setAttribute('scrolled', '')
-    } else {
-        document.getElementById('settingsContainer').removeAttribute('scrolled')
-    }
+function settingsTabScrollListener(e) {
+  if (
+    e.target.scrollTop >
+    Number.parseFloat(getComputedStyle(e.target.firstElementChild).marginTop)
+  ) {
+    document.getElementById("settingsContainer").setAttribute("scrolled", "");
+  } else {
+    document.getElementById("settingsContainer").removeAttribute("scrolled");
+  }
 }
 
 /**
  * Bind functionality for the settings navigation items.
  */
-function setupSettingsTabs(){
-    Array.from(document.getElementsByClassName('settingsNavItem')).map((val) => {
-        if(val.hasAttribute('rSc')){
-            val.onclick = () => {
-                settingsNavItemListener(val)
-            }
-        }
-    })
+function setupSettingsTabs() {
+  Array.from(document.getElementsByClassName("settingsNavItem")).map((val) => {
+    if (val.hasAttribute("rSc")) {
+      val.onclick = () => {
+        settingsNavItemListener(val);
+      };
+    }
+  });
 }
 
 /**
  * Settings nav item onclick lisener. Function is exposed so that
  * other UI elements can quickly toggle to a certain tab from other views.
- * 
+ *
  * @param {Element} ele The nav item which has been clicked.
  * @param {boolean} fade Optional. True to fade transition.
  */
-function settingsNavItemListener(ele, fade = true){
-    if(ele.hasAttribute('selected')){
-        return
+function settingsNavItemListener(ele, fade = true) {
+  if (ele.hasAttribute("selected")) {
+    return;
+  }
+  const navItems = document.getElementsByClassName("settingsNavItem");
+  for (let i = 0; i < navItems.length; i++) {
+    if (navItems[i].hasAttribute("selected")) {
+      navItems[i].removeAttribute("selected");
     }
-    const navItems = document.getElementsByClassName('settingsNavItem')
-    for(let i=0; i<navItems.length; i++){
-        if(navItems[i].hasAttribute('selected')){
-            navItems[i].removeAttribute('selected')
-        }
-    }
-    ele.setAttribute('selected', '')
-    let prevTab = selectedSettingsTab
-    selectedSettingsTab = ele.getAttribute('rSc')
+  }
+  ele.setAttribute("selected", "");
+  let prevTab = selectedSettingsTab;
+  selectedSettingsTab = ele.getAttribute("rSc");
 
-    document.getElementById(prevTab).onscroll = null
-    document.getElementById(selectedSettingsTab).onscroll = settingsTabScrollListener
+  document.getElementById(prevTab).onscroll = null;
+  document.getElementById(selectedSettingsTab).onscroll =
+    settingsTabScrollListener;
 
-    if(fade){
-        $(`#${prevTab}`).fadeOut(250, () => {
-            $(`#${selectedSettingsTab}`).fadeIn({
-                duration: 250,
-                start: () => {
-                    settingsTabScrollListener({
-                        target: document.getElementById(selectedSettingsTab)
-                    })
-                }
-            })
-        })
-    } else {
-        $(`#${prevTab}`).hide(0, () => {
-            $(`#${selectedSettingsTab}`).show({
-                duration: 0,
-                start: () => {
-                    settingsTabScrollListener({
-                        target: document.getElementById(selectedSettingsTab)
-                    })
-                }
-            })
-        })
-    }
+  if (fade) {
+    $(`#${prevTab}`).fadeOut(250, () => {
+      $(`#${selectedSettingsTab}`).fadeIn({
+        duration: 250,
+        start: () => {
+          settingsTabScrollListener({
+            target: document.getElementById(selectedSettingsTab),
+          });
+        },
+      });
+    });
+  } else {
+    $(`#${prevTab}`).hide(0, () => {
+      $(`#${selectedSettingsTab}`).show({
+        duration: 0,
+        start: () => {
+          settingsTabScrollListener({
+            target: document.getElementById(selectedSettingsTab),
+          });
+        },
+      });
+    });
+  }
 }
 
-const settingsNavDone = document.getElementById('settingsNavDone')
+const settingsNavDone = document.getElementById("settingsNavDone");
 
 /**
  * Set if the settings save (done) button is disabled.
- * 
+ *
  * @param {boolean} v True to disable, false to enable.
  */
-function settingsSaveDisabled(v){
-    settingsNavDone.disabled = v
+function settingsSaveDisabled(v) {
+  settingsNavDone.disabled = v;
 }
 
 /* Closes the settings view and saves all data. */
 settingsNavDone.onclick = () => {
-    saveSettingsValues()
-    saveModConfiguration()
-    ConfigManager.save()
-    saveDropinModConfiguration()
-    saveShaderpackSettings()
-    switchView(getCurrentView(), VIEWS.landing)
-}
+  saveSettingsValues();
+  saveModConfiguration();
+  ConfigManager.save();
+  saveDropinModConfiguration();
+  saveShaderpackSettings();
+  switchView(getCurrentView(), VIEWS.landing);
+};
 
 /**
  * Account Management Tab
  */
 
-const msftLoginLogger = LoggerUtil.getLogger('Microsoft Login')
-const msftLogoutLogger = LoggerUtil.getLogger('Microsoft Logout')
+const msftLoginLogger = LoggerUtil.getLogger("Microsoft Login");
+const msftLogoutLogger = LoggerUtil.getLogger("Microsoft Logout");
 
 // Bind the add mojang account button.
-document.getElementById('settingsAddMojangAccount').onclick = (e) => {
-    switchView(getCurrentView(), VIEWS.login, 500, 500, () => {
-        loginViewOnCancel = VIEWS.settings
-        loginViewOnSuccess = VIEWS.settings
-        loginCancelEnabled(true)
-    })
-}
+document.getElementById("settingsAddMojangAccount").onclick = (e) => {
+  switchView(getCurrentView(), VIEWS.login, 500, 500, () => {
+    loginViewOnCancel = VIEWS.settings;
+    loginViewOnSuccess = VIEWS.settings;
+    loginCancelEnabled(true);
+  });
+};
 
 // Bind the add microsoft account button.
-document.getElementById('settingsAddMicrosoftAccount').onclick = (e) => {
-    switchView(getCurrentView(), VIEWS.waiting, 500, 500, () => {
-        ipcRenderer.send(MSFT_OPCODE.OPEN_LOGIN, VIEWS.settings, VIEWS.settings)
-    })
-}
+document.getElementById("settingsAddMicrosoftAccount").onclick = (e) => {
+  switchView(getCurrentView(), VIEWS.waiting, 500, 500, () => {
+    ipcRenderer.send(MSFT_OPCODE.OPEN_LOGIN, VIEWS.settings, VIEWS.settings);
+  });
+};
 
 // Bind reply for Microsoft Login.
 ipcRenderer.on(MSFT_OPCODE.REPLY_LOGIN, (_, ...arguments_) => {
-    if (arguments_[0] === MSFT_REPLY_TYPE.ERROR) {
+  if (arguments_[0] === MSFT_REPLY_TYPE.ERROR) {
+    const viewOnClose = arguments_[2];
+    console.log(arguments_);
+    switchView(getCurrentView(), viewOnClose, 500, 500, () => {
+      if (arguments_[1] === MSFT_ERROR.NOT_FINISHED) {
+        // User cancelled.
+        msftLoginLogger.info("Login cancelled by user.");
+        return;
+      }
 
-        const viewOnClose = arguments_[2]
-        console.log(arguments_)
-        switchView(getCurrentView(), viewOnClose, 500, 500, () => {
+      // Unexpected error.
+      setOverlayContent(
+        "Quelque chose a mal tourné",
+        "L’authentification Microsoft a échoué. Veuillez réessayer.",
+        "OK"
+      );
+      setOverlayHandler(() => {
+        toggleOverlay(false);
+      });
+      toggleOverlay(true);
+    });
+  } else if (arguments_[0] === MSFT_REPLY_TYPE.SUCCESS) {
+    const queryMap = arguments_[1];
+    const viewOnClose = arguments_[2];
 
-            if(arguments_[1] === MSFT_ERROR.NOT_FINISHED) {
-                // User cancelled.
-                msftLoginLogger.info('Login cancelled by user.')
-                return
-            }
+    // Error from request to Microsoft.
+    if (Object.prototype.hasOwnProperty.call(queryMap, "error")) {
+      switchView(getCurrentView(), viewOnClose, 500, 500, () => {
+        // TODO Dont know what these errors are. Just show them I guess.
+        // This is probably if you messed up the app registration with Azure.
+        console.log(
+          "Error getting authCode, is Azure application registered correctly?"
+        );
+        console.log(error);
+        console.log(error_description);
+        console.log("Full query map", queryMap);
+        let error = queryMap.error; // Error might be 'access_denied' ?
+        let errorDesc = queryMap.error_description;
+        setOverlayContent(error, errorDesc, "OK");
+        setOverlayHandler(() => {
+          toggleOverlay(false);
+        });
+        toggleOverlay(true);
+      });
+    } else {
+      msftLoginLogger.info(
+        "Acquired authCode, proceeding with authentication."
+      );
 
-            // Unexpected error.
-            setOverlayContent(
-                'Quelque chose a mal tourné',
-                'L’authentification Microsoft a échoué. Veuillez réessayer.',
-                'OK'
-            )
-            setOverlayHandler(() => {
-                toggleOverlay(false)
-            })
-            toggleOverlay(true)
+      const authCode = queryMap.code;
+      AuthManager.addMicrosoftAccount(authCode)
+        .then((value) => {
+          updateSelectedAccount(value);
+          switchView(getCurrentView(), viewOnClose, 500, 500, () => {
+            prepareSettings();
+          });
         })
-    } else if(arguments_[0] === MSFT_REPLY_TYPE.SUCCESS) {
-        const queryMap = arguments_[1]
-        const viewOnClose = arguments_[2]
+        .catch((displayableError) => {
+          let actualDisplayableError;
+          if (isDisplayableError(displayableError)) {
+            msftLoginLogger.error("Error while logging in.", displayableError);
+            actualDisplayableError = displayableError;
+          } else {
+            // Uh oh.
+            msftLoginLogger.error(
+              "Unhandled error during login.",
+              displayableError
+            );
+            actualDisplayableError = {
+              title: "Erreur inconnue lors de la connexion",
+              desc: "Une erreur inconnue s’est produite. Veuillez consulter la console pour plus de détails.",
+            };
+          }
 
-        // Error from request to Microsoft.
-        if (Object.prototype.hasOwnProperty.call(queryMap, 'error')) {
-            switchView(getCurrentView(), viewOnClose, 500, 500, () => {
-                // TODO Dont know what these errors are. Just show them I guess.
-                // This is probably if you messed up the app registration with Azure.
-                console.log('Error getting authCode, is Azure application registered correctly?')
-                console.log(error)
-                console.log(error_description)
-                console.log('Full query map', queryMap)
-                let error = queryMap.error // Error might be 'access_denied' ?
-                let errorDesc = queryMap.error_description
-                setOverlayContent(
-                    error,
-                    errorDesc,
-                    'OK'
-                )
-                setOverlayHandler(() => {
-                    toggleOverlay(false)
-                })
-                toggleOverlay(true)
-
-            })
-        } else {
-
-            msftLoginLogger.info('Acquired authCode, proceeding with authentication.')
-
-            const authCode = queryMap.code
-            AuthManager.addMicrosoftAccount(authCode).then(value => {
-                updateSelectedAccount(value)
-                switchView(getCurrentView(), viewOnClose, 500, 500, () => {
-                    prepareSettings()
-                })
-            })
-                .catch((displayableError) => {
-
-                    let actualDisplayableError
-                    if(isDisplayableError(displayableError)) {
-                        msftLoginLogger.error('Error while logging in.', displayableError)
-                        actualDisplayableError = displayableError
-                    } else {
-                        // Uh oh.
-                        msftLoginLogger.error('Unhandled error during login.', displayableError)
-                        actualDisplayableError = {
-                            title: 'Erreur inconnue lors de la connexion',
-                            desc: 'Une erreur inconnue s’est produite. Veuillez consulter la console pour plus de détails.'
-                        }
-                    }
-
-                    switchView(getCurrentView(), viewOnClose, 500, 500, () => {
-                        setOverlayContent(actualDisplayableError.title, actualDisplayableError.desc, Lang.queryJS('login.tryAgain'))
-                        setOverlayHandler(() => {
-                            toggleOverlay(false)
-                        })
-                        toggleOverlay(true)
-                    })
-                })
-        }
+          switchView(getCurrentView(), viewOnClose, 500, 500, () => {
+            setOverlayContent(
+              actualDisplayableError.title,
+              actualDisplayableError.desc,
+              Lang.queryJS("login.tryAgain")
+            );
+            setOverlayHandler(() => {
+              toggleOverlay(false);
+            });
+            toggleOverlay(true);
+          });
+        });
     }
-})
+  }
+});
 
 /**
  * Bind functionality for the account selection buttons. If another account
  * is selected, the UI of the previously selected account will be updated.
  */
-function bindAuthAccountSelect(){
-    Array.from(document.getElementsByClassName('settingsAuthAccountSelect')).map((val) => {
-        val.onclick = (e) => {
-            if(val.hasAttribute('selected')){
-                return
-            }
-            const selectBtns = document.getElementsByClassName('settingsAuthAccountSelect')
-            for(let i=0; i<selectBtns.length; i++){
-                if(selectBtns[i].hasAttribute('selected')){
-                    selectBtns[i].removeAttribute('selected')
-                    selectBtns[i].innerHTML = 'Sélectionner ce Compte'
-                }
-            }
-            val.setAttribute('selected', '')
-            val.innerHTML = 'Compte sélectionné &#10004;'
-            setSelectedAccount(val.closest('.settingsAuthAccount').getAttribute('uuid'))
+function bindAuthAccountSelect() {
+  Array.from(document.getElementsByClassName("settingsAuthAccountSelect")).map(
+    (val) => {
+      val.onclick = (e) => {
+        if (val.hasAttribute("selected")) {
+          return;
         }
-    })
+        const selectBtns = document.getElementsByClassName(
+          "settingsAuthAccountSelect"
+        );
+        for (let i = 0; i < selectBtns.length; i++) {
+          if (selectBtns[i].hasAttribute("selected")) {
+            selectBtns[i].removeAttribute("selected");
+            selectBtns[i].innerHTML = "Sélectionner ce Compte";
+          }
+        }
+        val.setAttribute("selected", "");
+        val.innerHTML = "Compte sélectionné &#10004;";
+        setSelectedAccount(
+          val.closest(".settingsAuthAccount").getAttribute("uuid")
+        );
+      };
+    }
+  );
 }
 
 /**
@@ -456,214 +481,227 @@ function bindAuthAccountSelect(){
  * the selected account, another account will be selected and the UI will
  * be updated accordingly.
  */
-function bindAuthAccountLogOut(){
-    Array.from(document.getElementsByClassName('settingsAuthAccountLogOut')).map((val) => {
-        val.onclick = (e) => {
-            let isLastAccount = false
-            if(Object.keys(ConfigManager.getAuthAccounts()).length === 1){
-                isLastAccount = true
-                setOverlayContent(
-                    'Avertissement<br>Ceci est votre dernier compte',
-                    'Pour utiliser le launcher, vous devez être connecté à au moins un compte. Vous devrez vous reconnecter après. <br><br>Voulez-vous vraiment vous déconnecter ?',
-                    'Je suis sûr',
-                    'Annuler'
-                )
-                setOverlayHandler(() => {
-                    processLogOut(val, isLastAccount)
-                    toggleOverlay(false)
-                })
-                setDismissHandler(() => {
-                    toggleOverlay(false)
-                })
-                toggleOverlay(true, true)
-            } else {
-                processLogOut(val, isLastAccount)
-            }
-            
+function bindAuthAccountLogOut() {
+  Array.from(document.getElementsByClassName("settingsAuthAccountLogOut")).map(
+    (val) => {
+      val.onclick = (e) => {
+        let isLastAccount = false;
+        if (Object.keys(ConfigManager.getAuthAccounts()).length === 1) {
+          isLastAccount = true;
+          setOverlayContent(
+            "Avertissement<br>Ceci est votre dernier compte",
+            "Pour utiliser le launcher, vous devez être connecté à au moins un compte. Vous devrez vous reconnecter après. <br><br>Voulez-vous vraiment vous déconnecter ?",
+            "Je suis sûr",
+            "Annuler"
+          );
+          setOverlayHandler(() => {
+            processLogOut(val, isLastAccount);
+            toggleOverlay(false);
+          });
+          setDismissHandler(() => {
+            toggleOverlay(false);
+          });
+          toggleOverlay(true, true);
+        } else {
+          processLogOut(val, isLastAccount);
         }
-    })
+      };
+    }
+  );
 }
 
-let msAccDomElementCache
+let msAccDomElementCache;
 /**
  * Process a log out.
- * 
+ *
  * @param {Element} val The log out button element.
  * @param {boolean} isLastAccount If this logout is on the last added account.
  */
-function processLogOut(val, isLastAccount){
-    const parent = val.closest('.settingsAuthAccount')
-    const uuid = parent.getAttribute('uuid')
-    const prevSelAcc = ConfigManager.getSelectedAccount()
-    const targetAcc = ConfigManager.getAuthAccount(uuid)
-    if(targetAcc.type === 'microsoft') {
-        msAccDomElementCache = parent
-        switchView(getCurrentView(), VIEWS.waiting, 500, 500, () => {
-            ipcRenderer.send(MSFT_OPCODE.OPEN_LOGOUT, uuid, isLastAccount)
-        })
-    } else {
-        AuthManager.removeMojangAccount(uuid).then(() => {
-            if(!isLastAccount && uuid === prevSelAcc.uuid){
-                const selAcc = ConfigManager.getSelectedAccount()
-                refreshAuthAccountSelected(selAcc.uuid)
-                updateSelectedAccount(selAcc)
-                validateSelectedAccount()
-            }
-            if(isLastAccount) {
-                loginOptionsCancelEnabled(false)
-                loginOptionsViewOnLoginSuccess = VIEWS.settings
-                loginOptionsViewOnLoginCancel = VIEWS.loginOptions
-                switchView(getCurrentView(), VIEWS.loginOptions)
-            }
-        })
-        $(parent).fadeOut(250, () => {
-            parent.remove()
-        })
-    }
+function processLogOut(val, isLastAccount) {
+  const parent = val.closest(".settingsAuthAccount");
+  const uuid = parent.getAttribute("uuid");
+  const prevSelAcc = ConfigManager.getSelectedAccount();
+  const targetAcc = ConfigManager.getAuthAccount(uuid);
+  if (targetAcc.type === "microsoft") {
+    msAccDomElementCache = parent;
+    switchView(getCurrentView(), VIEWS.waiting, 500, 500, () => {
+      ipcRenderer.send(MSFT_OPCODE.OPEN_LOGOUT, uuid, isLastAccount);
+    });
+  } else {
+    AuthManager.removeMojangAccount(uuid).then(() => {
+      if (!isLastAccount && uuid === prevSelAcc.uuid) {
+        const selAcc = ConfigManager.getSelectedAccount();
+        refreshAuthAccountSelected(selAcc.uuid);
+        updateSelectedAccount(selAcc);
+        validateSelectedAccount();
+      }
+      if (isLastAccount) {
+        loginOptionsCancelEnabled(false);
+        loginOptionsViewOnLoginSuccess = VIEWS.settings;
+        loginOptionsViewOnLoginCancel = VIEWS.loginOptions;
+        switchView(getCurrentView(), VIEWS.loginOptions);
+      }
+    });
+    $(parent).fadeOut(250, () => {
+      parent.remove();
+    });
+  }
 }
 
 // Bind reply for Microsoft Logout.
 ipcRenderer.on(MSFT_OPCODE.REPLY_LOGOUT, (_, ...arguments_) => {
-    if (arguments_[0] === MSFT_REPLY_TYPE.ERROR) {
-        switchView(getCurrentView(), VIEWS.settings, 500, 500, () => {
+  if (arguments_[0] === MSFT_REPLY_TYPE.ERROR) {
+    switchView(getCurrentView(), VIEWS.settings, 500, 500, () => {
+      if (arguments_.length > 1 && arguments_[1] === MSFT_ERROR.NOT_FINISHED) {
+        // User cancelled.
+        msftLogoutLogger.info("Logout cancelled by user.");
+        return;
+      }
 
-            if(arguments_.length > 1 && arguments_[1] === MSFT_ERROR.NOT_FINISHED) {
-                // User cancelled.
-                msftLogoutLogger.info('Logout cancelled by user.')
-                return
-            }
+      // Unexpected error.
+      setOverlayContent(
+        "Quelque chose a mal tourné",
+        "La déconnexion de Microsoft a échoué. Veuillez réessayer.",
+        "OK"
+      );
+      setOverlayHandler(() => {
+        toggleOverlay(false);
+      });
+      toggleOverlay(true);
+    });
+  } else if (arguments_[0] === MSFT_REPLY_TYPE.SUCCESS) {
+    const uuid = arguments_[1];
+    const isLastAccount = arguments_[2];
+    const prevSelAcc = ConfigManager.getSelectedAccount();
 
-            // Unexpected error.
-            setOverlayContent(
-                'Quelque chose a mal tourné',
-                'La déconnexion de Microsoft a échoué. Veuillez réessayer.',
-                'OK'
-            )
-            setOverlayHandler(() => {
-                toggleOverlay(false)
-            })
-            toggleOverlay(true)
-        })
-    } else if(arguments_[0] === MSFT_REPLY_TYPE.SUCCESS) {
-        
-        const uuid = arguments_[1]
-        const isLastAccount = arguments_[2]
-        const prevSelAcc = ConfigManager.getSelectedAccount()
+    msftLogoutLogger.info("Logout Successful. uuid:", uuid);
 
-        msftLogoutLogger.info('Logout Successful. uuid:', uuid)
-        
-        AuthManager.removeMicrosoftAccount(uuid)
-            .then(() => {
-                if(!isLastAccount && uuid === prevSelAcc.uuid){
-                    const selAcc = ConfigManager.getSelectedAccount()
-                    refreshAuthAccountSelected(selAcc.uuid)
-                    updateSelectedAccount(selAcc)
-                    validateSelectedAccount()
-                }
-                if(isLastAccount) {
-                    loginOptionsCancelEnabled(false)
-                    loginOptionsViewOnLoginSuccess = VIEWS.settings
-                    loginOptionsViewOnLoginCancel = VIEWS.loginOptions
-                    switchView(getCurrentView(), VIEWS.loginOptions)
-                }
-                if(msAccDomElementCache) {
-                    msAccDomElementCache.remove()
-                    msAccDomElementCache = null
-                }
-            })
-            .finally(() => {
-                if(!isLastAccount) {
-                    switchView(getCurrentView(), VIEWS.settings, 500, 500)
-                }
-            })
-
-    }
-})
+    AuthManager.removeMicrosoftAccount(uuid)
+      .then(() => {
+        if (!isLastAccount && uuid === prevSelAcc.uuid) {
+          const selAcc = ConfigManager.getSelectedAccount();
+          refreshAuthAccountSelected(selAcc.uuid);
+          updateSelectedAccount(selAcc);
+          validateSelectedAccount();
+        }
+        if (isLastAccount) {
+          loginOptionsCancelEnabled(false);
+          loginOptionsViewOnLoginSuccess = VIEWS.settings;
+          loginOptionsViewOnLoginCancel = VIEWS.loginOptions;
+          switchView(getCurrentView(), VIEWS.loginOptions);
+        }
+        if (msAccDomElementCache) {
+          msAccDomElementCache.remove();
+          msAccDomElementCache = null;
+        }
+      })
+      .finally(() => {
+        if (!isLastAccount) {
+          switchView(getCurrentView(), VIEWS.settings, 500, 500);
+        }
+      });
+  }
+});
 
 /**
  * Refreshes the status of the selected account on the auth account
  * elements.
- * 
+ *
  * @param {string} uuid The UUID of the new selected account.
  */
-function refreshAuthAccountSelected(uuid){
-    Array.from(document.getElementsByClassName('settingsAuthAccount')).map((val) => {
-        const selBtn = val.getElementsByClassName('settingsAuthAccountSelect')[0]
-        if(uuid === val.getAttribute('uuid')){
-            selBtn.setAttribute('selected', '')
-            selBtn.innerHTML = 'Compte sélectionné &#10004;'
-        } else {
-            if(selBtn.hasAttribute('selected')){
-                selBtn.removeAttribute('selected')
-            }
-            selBtn.innerHTML = 'Sélectionner ce compte'
+function refreshAuthAccountSelected(uuid) {
+  Array.from(document.getElementsByClassName("settingsAuthAccount")).map(
+    (val) => {
+      const selBtn = val.getElementsByClassName("settingsAuthAccountSelect")[0];
+      if (uuid === val.getAttribute("uuid")) {
+        selBtn.setAttribute("selected", "");
+        selBtn.innerHTML = "Compte sélectionné &#10004;";
+      } else {
+        if (selBtn.hasAttribute("selected")) {
+          selBtn.removeAttribute("selected");
         }
-    })
+        selBtn.innerHTML = "Sélectionner ce compte";
+      }
+    }
+  );
 }
 
-const settingsCurrentMicrosoftAccounts = document.getElementById('settingsCurrentMicrosoftAccounts')
-const settingsCurrentMojangAccounts = document.getElementById('settingsCurrentMojangAccounts')
+const settingsCurrentMicrosoftAccounts = document.getElementById(
+  "settingsCurrentMicrosoftAccounts"
+);
+const settingsCurrentMojangAccounts = document.getElementById(
+  "settingsCurrentMojangAccounts"
+);
 
 /**
  * Add auth account elements for each one stored in the authentication database.
  */
-function populateAuthAccounts(){
-    const authAccounts = ConfigManager.getAuthAccounts()
-    const authKeys = Object.keys(authAccounts)
-    if(authKeys.length === 0){
-        return
-    }
-    const selectedUUID = ConfigManager.getSelectedAccount().uuid
+function populateAuthAccounts() {
+  const authAccounts = ConfigManager.getAuthAccounts();
+  const authKeys = Object.keys(authAccounts);
+  if (authKeys.length === 0) {
+    return;
+  }
+  const selectedUUID = ConfigManager.getSelectedAccount().uuid;
 
-    let microsoftAuthAccountStr = ''
-    let mojangAuthAccountStr = ''
+  let microsoftAuthAccountStr = "";
+  let mojangAuthAccountStr = "";
 
-    authKeys.forEach((val) => {
-        const acc = authAccounts[val]
+  authKeys.forEach((val) => {
+    const acc = authAccounts[val];
 
-        const accHtml = `<div class="settingsAuthAccount" uuid="${acc.uuid}">
+    const accHtml = `<div class="settingsAuthAccount" uuid="${acc.uuid}">
             <div class="settingsAuthAccountLeft">
-                <img class="settingsAuthAccountImage" alt="${acc.displayName}" src="https://mc-heads.net/body/${acc.uuid}/60">
+                <img class="settingsAuthAccountImage" alt="${
+                  acc.displayName
+                }" src="https://mc-heads.net/body/${acc.uuid}/60">
             </div>
             <div class="settingsAuthAccountRight">
                 <div class="settingsAuthAccountDetails">
                     <div class="settingsAuthAccountDetailPane">
                         <div class="settingsAuthAccountDetailTitle">Pseudo</div>
-                        <div class="settingsAuthAccountDetailValue">${acc.displayName}</div>
+                        <div class="settingsAuthAccountDetailValue">${
+                          acc.displayName
+                        }</div>
                     </div>
                     <div class="settingsAuthAccountDetailPane">
                         <div class="settingsAuthAccountDetailTitle">UUID</div>
-                        <div class="settingsAuthAccountDetailValue">${acc.uuid}</div>
+                        <div class="settingsAuthAccountDetailValue">${
+                          acc.uuid
+                        }</div>
                     </div>
                 </div>
                 <div class="settingsAuthAccountActions">
-                    <button class="settingsAuthAccountSelect" ${selectedUUID === acc.uuid ? 'selected>Compte sélectionné &#10004;' : '>Sélectionner ce compte'}</button>
+                    <button class="settingsAuthAccountSelect" ${
+                      selectedUUID === acc.uuid
+                        ? "selected>Compte sélectionné &#10004;"
+                        : ">Sélectionner ce compte"
+                    }</button>
                     <div class="settingsAuthAccountWrapper">
                         <button class="settingsAuthAccountLogOut">Log Out</button>
                     </div>
                 </div>
             </div>
-        </div>`
+        </div>`;
 
-        if(acc.type === 'microsoft') {
-            microsoftAuthAccountStr += accHtml
-        } else {
-            mojangAuthAccountStr += accHtml
-        }
+    if (acc.type === "microsoft") {
+      microsoftAuthAccountStr += accHtml;
+    } else {
+      mojangAuthAccountStr += accHtml;
+    }
+  });
 
-    })
-
-    settingsCurrentMicrosoftAccounts.innerHTML = microsoftAuthAccountStr
-    settingsCurrentMojangAccounts.innerHTML = mojangAuthAccountStr
+  settingsCurrentMicrosoftAccounts.innerHTML = microsoftAuthAccountStr;
+  settingsCurrentMojangAccounts.innerHTML = mojangAuthAccountStr;
 }
 
 /**
  * Prepare the accounts tab for display.
  */
 function prepareAccountsTab() {
-    populateAuthAccounts()
-    bindAuthAccountSelect()
-    bindAuthAccountLogOut()
+  populateAuthAccounts();
+  bindAuthAccountSelect();
+  bindAuthAccountLogOut();
 }
 
 /**
@@ -671,59 +709,69 @@ function prepareAccountsTab() {
  */
 
 /**
-  * Disable decimals, negative signs, and scientific notation.
-  */
-document.getElementById('settingsGameWidth').addEventListener('keydown', (e) => {
-    if(/^[-.eE]$/.test(e.key)){
-        e.preventDefault()
+ * Disable decimals, negative signs, and scientific notation.
+ */
+document
+  .getElementById("settingsGameWidth")
+  .addEventListener("keydown", (e) => {
+    if (/^[-.eE]$/.test(e.key)) {
+      e.preventDefault();
     }
-})
-document.getElementById('settingsGameHeight').addEventListener('keydown', (e) => {
-    if(/^[-.eE]$/.test(e.key)){
-        e.preventDefault()
+  });
+document
+  .getElementById("settingsGameHeight")
+  .addEventListener("keydown", (e) => {
+    if (/^[-.eE]$/.test(e.key)) {
+      e.preventDefault();
     }
-})
+  });
 
 /**
  * Mods Tab
  */
 
-const settingsModsContainer = document.getElementById('settingsModsContainer')
+const settingsModsContainer = document.getElementById("settingsModsContainer");
 
 /**
  * Resolve and update the mods on the UI.
  */
-function resolveModsForUI(){
-    const serv = ConfigManager.getSelectedServer()
+function resolveModsForUI() {
+  const serv = ConfigManager.getSelectedServer();
 
-    const distro = DistroManager.getDistribution()
-    const servConf = ConfigManager.getModConfiguration(serv)
+  const distro = DistroManager.getDistribution();
+  const servConf = ConfigManager.getModConfiguration(serv);
 
-    const modStr = parseModulesForUI(distro.getServer(serv).getModules(), false, servConf.mods)
+  const modStr = parseModulesForUI(
+    distro.getServer(serv).getModules(),
+    false,
+    servConf.mods
+  );
 
-    document.getElementById('settingsReqModsContent').innerHTML = modStr.reqMods
-    document.getElementById('settingsOptModsContent').innerHTML = modStr.optMods
+  document.getElementById("settingsReqModsContent").innerHTML = modStr.reqMods;
+  document.getElementById("settingsOptModsContent").innerHTML = modStr.optMods;
 }
 
 /**
  * Recursively build the mod UI elements.
- * 
+ *
  * @param {Object[]} mdls An array of modules to parse.
  * @param {boolean} submodules Whether or not we are parsing submodules.
  * @param {Object} servConf The server configuration object for this module level.
  */
-function parseModulesForUI(mdls, submodules, servConf){
+function parseModulesForUI(mdls, submodules, servConf) {
+  let reqMods = "";
+  let optMods = "";
 
-    let reqMods = ''
-    let optMods = ''
-
-    for(const mdl of mdls){
-
-        if(mdl.getType() === DistroManager.Types.ForgeMod || mdl.getType() === DistroManager.Types.LiteMod || mdl.getType() === DistroManager.Types.LiteLoader){
-
-            if(mdl.getRequired().isRequired()){
-
-                reqMods += `<div id="${mdl.getVersionlessID()}" class="settingsBaseMod settings${submodules ? 'Sub' : ''}Mod" enabled>
+  for (const mdl of mdls) {
+    if (
+      mdl.getType() === DistroManager.Types.ForgeMod ||
+      mdl.getType() === DistroManager.Types.LiteMod ||
+      mdl.getType() === DistroManager.Types.LiteLoader
+    ) {
+      if (mdl.getRequired().isRequired()) {
+        reqMods += `<div id="${mdl.getVersionlessID()}" class="settingsBaseMod settings${
+          submodules ? "Sub" : ""
+        }Mod" enabled>
                     <div class="settingsModContent">
                         <div class="settingsModMainWrapper">
                             <div class="settingsModStatus"></div>
@@ -737,17 +785,27 @@ function parseModulesForUI(mdls, submodules, servConf){
                             <span class="toggleSwitchSlider"></span>
                         </label>
                     </div>
-                    ${mdl.hasSubModules() ? `<div class="settingsSubModContainer">
-                        ${Object.values(parseModulesForUI(mdl.getSubModules(), true, servConf[mdl.getVersionlessID()])).join('')}
-                    </div>` : ''}
-                </div>`
+                    ${
+                      mdl.hasSubModules()
+                        ? `<div class="settingsSubModContainer">
+                        ${Object.values(
+                          parseModulesForUI(
+                            mdl.getSubModules(),
+                            true,
+                            servConf[mdl.getVersionlessID()]
+                          )
+                        ).join("")}
+                    </div>`
+                        : ""
+                    }
+                </div>`;
+      } else {
+        const conf = servConf[mdl.getVersionlessID()];
+        const val = typeof conf === "object" ? conf.value : conf;
 
-            } else {
-
-                const conf = servConf[mdl.getVersionlessID()]
-                const val = typeof conf === 'object' ? conf.value : conf
-
-                optMods += `<div id="${mdl.getVersionlessID()}" class="settingsBaseMod settings${submodules ? 'Sub' : ''}Mod" ${val ? 'enabled' : ''}>
+        optMods += `<div id="${mdl.getVersionlessID()}" class="settingsBaseMod settings${
+          submodules ? "Sub" : ""
+        }Mod" ${val ? "enabled" : ""}>
                     <div class="settingsModContent">
                         <div class="settingsModMainWrapper">
                             <div class="settingsModStatus"></div>
@@ -757,295 +815,354 @@ function parseModulesForUI(mdls, submodules, servConf){
                             </div>
                         </div>
                         <label class="toggleSwitch">
-                            <input type="checkbox" formod="${mdl.getVersionlessID()}" ${val ? 'checked' : ''}>
+                            <input type="checkbox" formod="${mdl.getVersionlessID()}" ${
+          val ? "checked" : ""
+        }>
                             <span class="toggleSwitchSlider"></span>
                         </label>
                     </div>
-                    ${mdl.hasSubModules() ? `<div class="settingsSubModContainer">
-                        ${Object.values(parseModulesForUI(mdl.getSubModules(), true, conf.mods)).join('')}
-                    </div>` : ''}
-                </div>`
-
-            }
-        }
+                    ${
+                      mdl.hasSubModules()
+                        ? `<div class="settingsSubModContainer">
+                        ${Object.values(
+                          parseModulesForUI(
+                            mdl.getSubModules(),
+                            true,
+                            conf.mods
+                          )
+                        ).join("")}
+                    </div>`
+                        : ""
+                    }
+                </div>`;
+      }
     }
+  }
 
-    return {
-        reqMods,
-        optMods
-    }
-
+  return {
+    reqMods,
+    optMods,
+  };
 }
 
 /**
  * Bind functionality to mod config toggle switches. Switching the value
  * will also switch the status color on the left of the mod UI.
  */
-function bindModsToggleSwitch(){
-    const sEls = settingsModsContainer.querySelectorAll('[formod]')
-    Array.from(sEls).map((v, index, arr) => {
-        v.onchange = () => {
-            if(v.checked) {
-                document.getElementById(v.getAttribute('formod')).setAttribute('enabled', '')
-            } else {
-                document.getElementById(v.getAttribute('formod')).removeAttribute('enabled')
-            }
-        }
-    })
+function bindModsToggleSwitch() {
+  const sEls = settingsModsContainer.querySelectorAll("[formod]");
+  Array.from(sEls).map((v, index, arr) => {
+    v.onchange = () => {
+      if (v.checked) {
+        document
+          .getElementById(v.getAttribute("formod"))
+          .setAttribute("enabled", "");
+      } else {
+        document
+          .getElementById(v.getAttribute("formod"))
+          .removeAttribute("enabled");
+      }
+    };
+  });
 }
-
 
 /**
  * Save the mod configuration based on the UI values.
  */
-function saveModConfiguration(){
-    const serv = ConfigManager.getSelectedServer()
-    const modConf = ConfigManager.getModConfiguration(serv)
-    modConf.mods = _saveModConfiguration(modConf.mods)
-    ConfigManager.setModConfiguration(serv, modConf)
+function saveModConfiguration() {
+  const serv = ConfigManager.getSelectedServer();
+  const modConf = ConfigManager.getModConfiguration(serv);
+  modConf.mods = _saveModConfiguration(modConf.mods);
+  ConfigManager.setModConfiguration(serv, modConf);
 }
 
 /**
  * Recursively save mod config with submods.
- * 
+ *
  * @param {Object} modConf Mod config object to save.
  */
-function _saveModConfiguration(modConf){
-    for(let m of Object.entries(modConf)){
-        const tSwitch = settingsModsContainer.querySelectorAll(`[formod='${m[0]}']`)
-        if(!tSwitch[0].hasAttribute('dropin')){
-            if(typeof m[1] === 'boolean'){
-                modConf[m[0]] = tSwitch[0].checked
-            } else {
-                if(m[1] != null){
-                    if(tSwitch.length > 0){
-                        modConf[m[0]].value = tSwitch[0].checked
-                    }
-                    modConf[m[0]].mods = _saveModConfiguration(modConf[m[0]].mods)
-                }
-            }
+function _saveModConfiguration(modConf) {
+  for (let m of Object.entries(modConf)) {
+    const tSwitch = settingsModsContainer.querySelectorAll(
+      `[formod='${m[0]}']`
+    );
+    if (!tSwitch[0].hasAttribute("dropin")) {
+      if (typeof m[1] === "boolean") {
+        modConf[m[0]] = tSwitch[0].checked;
+      } else {
+        if (m[1] != null) {
+          if (tSwitch.length > 0) {
+            modConf[m[0]].value = tSwitch[0].checked;
+          }
+          modConf[m[0]].mods = _saveModConfiguration(modConf[m[0]].mods);
         }
+      }
     }
-    return modConf
+  }
+  return modConf;
 }
 
 // Drop-in mod elements.
 
-let CACHE_SETTINGS_MODS_DIR
-let CACHE_DROPIN_MODS
+let CACHE_SETTINGS_MODS_DIR;
+let CACHE_DROPIN_MODS;
 
 /**
  * Resolve any located drop-in mods for this server and
  * populate the results onto the UI.
  */
-function resolveDropinModsForUI(){
-    const serv = DistroManager.getDistribution().getServer(ConfigManager.getSelectedServer())
-    CACHE_SETTINGS_MODS_DIR = path.join(ConfigManager.getInstanceDirectory(), serv.getID(), 'mods')
-    CACHE_DROPIN_MODS = DropinModUtil.scanForDropinMods(CACHE_SETTINGS_MODS_DIR, serv.getMinecraftVersion())
+function resolveDropinModsForUI() {
+  const serv = DistroManager.getDistribution().getServer(
+    ConfigManager.getSelectedServer()
+  );
+  CACHE_SETTINGS_MODS_DIR = path.join(
+    ConfigManager.getInstanceDirectory(),
+    serv.getID(),
+    "mods"
+  );
+  CACHE_DROPIN_MODS = DropinModUtil.scanForDropinMods(
+    CACHE_SETTINGS_MODS_DIR,
+    serv.getMinecraftVersion()
+  );
 
-    let dropinMods = ''
+  let dropinMods = "";
 
-    for(dropin of CACHE_DROPIN_MODS){
-        dropinMods += `<div id="${dropin.fullName}" class="settingsBaseMod settingsDropinMod" ${!dropin.disabled ? 'enabled' : ''}>
+  for (dropin of CACHE_DROPIN_MODS) {
+    dropinMods += `<div id="${
+      dropin.fullName
+    }" class="settingsBaseMod settingsDropinMod" ${
+      !dropin.disabled ? "enabled" : ""
+    }>
                     <div class="settingsModContent">
                         <div class="settingsModMainWrapper">
                             <div class="settingsModStatus"></div>
                             <div class="settingsModDetails">
-                                <span class="settingsModName">${dropin.name}</span>
+                                <span class="settingsModName">${
+                                  dropin.name
+                                }</span>
                                 <div class="settingsDropinRemoveWrapper">
-                                    <button class="settingsDropinRemoveButton" remmod="${dropin.fullName}">Remove</button>
+                                    <button class="settingsDropinRemoveButton" remmod="${
+                                      dropin.fullName
+                                    }">Remove</button>
                                 </div>
                             </div>
                         </div>
                         <label class="toggleSwitch">
-                            <input type="checkbox" formod="${dropin.fullName}" dropin ${!dropin.disabled ? 'checked' : ''}>
+                            <input type="checkbox" formod="${
+                              dropin.fullName
+                            }" dropin ${!dropin.disabled ? "checked" : ""}>
                             <span class="toggleSwitchSlider"></span>
                         </label>
                     </div>
-                </div>`
-    }
+                </div>`;
+  }
 
-    document.getElementById('settingsDropinModsContent').innerHTML = dropinMods
+  document.getElementById("settingsDropinModsContent").innerHTML = dropinMods;
 }
 
 /**
  * Bind the remove button for each loaded drop-in mod.
  */
-function bindDropinModsRemoveButton(){
-    const sEls = settingsModsContainer.querySelectorAll('[remmod]')
-    Array.from(sEls).map((v, index, arr) => {
-        v.onclick = async () => {
-            const fullName = v.getAttribute('remmod')
-            const res = await DropinModUtil.deleteDropinMod(CACHE_SETTINGS_MODS_DIR, fullName)
-            if(res){
-                document.getElementById(fullName).remove()
-            } else {
-                setOverlayContent(
-                    `Échec de la suppression<br>du module intégré ${fullName}`,
-                    'Assurez-vous que le fichier n’est pas utilisé et réessayez.',
-                    'Ok'
-                )
-                setOverlayHandler(null)
-                toggleOverlay(true)
-            }
-        }
-    })
+function bindDropinModsRemoveButton() {
+  const sEls = settingsModsContainer.querySelectorAll("[remmod]");
+  Array.from(sEls).map((v, index, arr) => {
+    v.onclick = async () => {
+      const fullName = v.getAttribute("remmod");
+      const res = await DropinModUtil.deleteDropinMod(
+        CACHE_SETTINGS_MODS_DIR,
+        fullName
+      );
+      if (res) {
+        document.getElementById(fullName).remove();
+      } else {
+        setOverlayContent(
+          `Échec de la suppression<br>du module intégré ${fullName}`,
+          "Assurez-vous que le fichier n’est pas utilisé et réessayez.",
+          "Ok"
+        );
+        setOverlayHandler(null);
+        toggleOverlay(true);
+      }
+    };
+  });
 }
 
 /**
  * Bind functionality to the file system button for the selected
  * server configuration.
  */
-function bindDropinModFileSystemButton(){
-    const fsBtn = document.getElementById('settingsDropinFileSystemButton')
-    fsBtn.onclick = () => {
-        DropinModUtil.validateDir(CACHE_SETTINGS_MODS_DIR)
-        shell.openPath(CACHE_SETTINGS_MODS_DIR)
-    }
-    fsBtn.ondragenter = e => {
-        e.dataTransfer.dropEffect = 'move'
-        fsBtn.setAttribute('drag', '')
-        e.preventDefault()
-    }
-    fsBtn.ondragover = e => {
-        e.preventDefault()
-    }
-    fsBtn.ondragleave = e => {
-        fsBtn.removeAttribute('drag')
-    }
+function bindDropinModFileSystemButton() {
+  const fsBtn = document.getElementById("settingsDropinFileSystemButton");
+  fsBtn.onclick = () => {
+    DropinModUtil.validateDir(CACHE_SETTINGS_MODS_DIR);
+    shell.openPath(CACHE_SETTINGS_MODS_DIR);
+  };
+  fsBtn.ondragenter = (e) => {
+    e.dataTransfer.dropEffect = "move";
+    fsBtn.setAttribute("drag", "");
+    e.preventDefault();
+  };
+  fsBtn.ondragover = (e) => {
+    e.preventDefault();
+  };
+  fsBtn.ondragleave = (e) => {
+    fsBtn.removeAttribute("drag");
+  };
 
-    fsBtn.ondrop = e => {
-        fsBtn.removeAttribute('drag')
-        e.preventDefault()
+  fsBtn.ondrop = (e) => {
+    fsBtn.removeAttribute("drag");
+    e.preventDefault();
 
-        DropinModUtil.addDropinMods(e.dataTransfer.files, CACHE_SETTINGS_MODS_DIR)
-        reloadDropinMods()
-    }
+    DropinModUtil.addDropinMods(e.dataTransfer.files, CACHE_SETTINGS_MODS_DIR);
+    reloadDropinMods();
+  };
 }
 
 /**
  * Save drop-in mod states. Enabling and disabling is just a matter
  * of adding/removing the .disabled extension.
  */
-function saveDropinModConfiguration(){
-    for(dropin of CACHE_DROPIN_MODS){
-        const dropinUI = document.getElementById(dropin.fullName)
-        if(dropinUI != null){
-            const dropinUIEnabled = dropinUI.hasAttribute('enabled')
-            if(DropinModUtil.isDropinModEnabled(dropin.fullName) != dropinUIEnabled){
-                DropinModUtil.toggleDropinMod(CACHE_SETTINGS_MODS_DIR, dropin.fullName, dropinUIEnabled).catch(err => {
-                    if(!isOverlayVisible()){
-                        setOverlayContent(
-                            'Echec de basculement<br>Un ou plusieurs modules déroulants',
-                            err.message,
-                            'Okay'
-                        )
-                        setOverlayHandler(null)
-                        toggleOverlay(true)
-                    }
-                })
-            }
-        }
+function saveDropinModConfiguration() {
+  for (dropin of CACHE_DROPIN_MODS) {
+    const dropinUI = document.getElementById(dropin.fullName);
+    if (dropinUI != null) {
+      const dropinUIEnabled = dropinUI.hasAttribute("enabled");
+      if (
+        DropinModUtil.isDropinModEnabled(dropin.fullName) != dropinUIEnabled
+      ) {
+        DropinModUtil.toggleDropinMod(
+          CACHE_SETTINGS_MODS_DIR,
+          dropin.fullName,
+          dropinUIEnabled
+        ).catch((err) => {
+          if (!isOverlayVisible()) {
+            setOverlayContent(
+              "Echec de basculement<br>Un ou plusieurs modules déroulants",
+              err.message,
+              "Okay"
+            );
+            setOverlayHandler(null);
+            toggleOverlay(true);
+          }
+        });
+      }
     }
+  }
 }
 
 // Refresh the drop-in mods when F5 is pressed.
 // Only active on the mods tab.
-document.addEventListener('keydown', (e) => {
-    if(getCurrentView() === VIEWS.settings && selectedSettingsTab === 'settingsTabMods'){
-        if(e.key === 'F5'){
-            reloadDropinMods()
-            saveShaderpackSettings()
-            resolveShaderpacksForUI()
-        }
+document.addEventListener("keydown", (e) => {
+  if (
+    getCurrentView() === VIEWS.settings &&
+    selectedSettingsTab === "settingsTabMods"
+  ) {
+    if (e.key === "F5") {
+      reloadDropinMods();
+      saveShaderpackSettings();
+      resolveShaderpacksForUI();
     }
-})
+  }
+});
 
-function reloadDropinMods(){
-    resolveDropinModsForUI()
-    bindDropinModsRemoveButton()
-    bindDropinModFileSystemButton()
-    bindModsToggleSwitch()
+function reloadDropinMods() {
+  resolveDropinModsForUI();
+  bindDropinModsRemoveButton();
+  bindDropinModFileSystemButton();
+  bindModsToggleSwitch();
 }
 
 // Shaderpack
 
-let CACHE_SETTINGS_INSTANCE_DIR
-let CACHE_SHADERPACKS
-let CACHE_SELECTED_SHADERPACK
+let CACHE_SETTINGS_INSTANCE_DIR;
+let CACHE_SHADERPACKS;
+let CACHE_SELECTED_SHADERPACK;
 
 /**
  * Load shaderpack information.
  */
-function resolveShaderpacksForUI(){
-    const serv = DistroManager.getDistribution().getServer(ConfigManager.getSelectedServer())
-    CACHE_SETTINGS_INSTANCE_DIR = path.join(ConfigManager.getInstanceDirectory(), serv.getID())
-    CACHE_SHADERPACKS = DropinModUtil.scanForShaderpacks(CACHE_SETTINGS_INSTANCE_DIR)
-    CACHE_SELECTED_SHADERPACK = DropinModUtil.getEnabledShaderpack(CACHE_SETTINGS_INSTANCE_DIR)
+function resolveShaderpacksForUI() {
+  const serv = DistroManager.getDistribution().getServer(
+    ConfigManager.getSelectedServer()
+  );
+  CACHE_SETTINGS_INSTANCE_DIR = path.join(
+    ConfigManager.getInstanceDirectory(),
+    serv.getID()
+  );
+  CACHE_SHADERPACKS = DropinModUtil.scanForShaderpacks(
+    CACHE_SETTINGS_INSTANCE_DIR
+  );
+  CACHE_SELECTED_SHADERPACK = DropinModUtil.getEnabledShaderpack(
+    CACHE_SETTINGS_INSTANCE_DIR
+  );
 
-    setShadersOptions(CACHE_SHADERPACKS, CACHE_SELECTED_SHADERPACK)
+  setShadersOptions(CACHE_SHADERPACKS, CACHE_SELECTED_SHADERPACK);
 }
 
-function setShadersOptions(arr, selected){
-    const cont = document.getElementById('settingsShadersOptions')
-    cont.innerHTML = ''
-    for(let opt of arr) {
-        const d = document.createElement('DIV')
-        d.innerHTML = opt.name
-        d.setAttribute('value', opt.fullName)
-        if(opt.fullName === selected) {
-            d.setAttribute('selected', '')
-            document.getElementById('settingsShadersSelected').innerHTML = opt.name
-        }
-        d.addEventListener('click', function(e) {
-            this.parentNode.previousElementSibling.innerHTML = this.innerHTML
-            for(let sib of this.parentNode.children){
-                sib.removeAttribute('selected')
-            }
-            this.setAttribute('selected', '')
-            closeSettingsSelect()
-        })
-        cont.appendChild(d)
+function setShadersOptions(arr, selected) {
+  const cont = document.getElementById("settingsShadersOptions");
+  cont.innerHTML = "";
+  for (let opt of arr) {
+    const d = document.createElement("DIV");
+    d.innerHTML = opt.name;
+    d.setAttribute("value", opt.fullName);
+    if (opt.fullName === selected) {
+      d.setAttribute("selected", "");
+      document.getElementById("settingsShadersSelected").innerHTML = opt.name;
     }
+    d.addEventListener("click", function (e) {
+      this.parentNode.previousElementSibling.innerHTML = this.innerHTML;
+      for (let sib of this.parentNode.children) {
+        sib.removeAttribute("selected");
+      }
+      this.setAttribute("selected", "");
+      closeSettingsSelect();
+    });
+    cont.appendChild(d);
+  }
 }
 
-function saveShaderpackSettings(){
-    let sel = 'OFF'
-    for(let opt of document.getElementById('settingsShadersOptions').childNodes){
-        if(opt.hasAttribute('selected')){
-            sel = opt.getAttribute('value')
-        }
+function saveShaderpackSettings() {
+  let sel = "OFF";
+  for (let opt of document.getElementById("settingsShadersOptions")
+    .childNodes) {
+    if (opt.hasAttribute("selected")) {
+      sel = opt.getAttribute("value");
     }
-    DropinModUtil.setEnabledShaderpack(CACHE_SETTINGS_INSTANCE_DIR, sel)
+  }
+  DropinModUtil.setEnabledShaderpack(CACHE_SETTINGS_INSTANCE_DIR, sel);
 }
 
 function bindShaderpackButton() {
-    const spBtn = document.getElementById('settingsShaderpackButton')
-    spBtn.onclick = () => {
-        const p = path.join(CACHE_SETTINGS_INSTANCE_DIR, 'shaderpacks')
-        DropinModUtil.validateDir(p)
-        shell.openPath(p)
-    }
-    spBtn.ondragenter = e => {
-        e.dataTransfer.dropEffect = 'move'
-        spBtn.setAttribute('drag', '')
-        e.preventDefault()
-    }
-    spBtn.ondragover = e => {
-        e.preventDefault()
-    }
-    spBtn.ondragleave = e => {
-        spBtn.removeAttribute('drag')
-    }
+  const spBtn = document.getElementById("settingsShaderpackButton");
+  spBtn.onclick = () => {
+    const p = path.join(CACHE_SETTINGS_INSTANCE_DIR, "shaderpacks");
+    DropinModUtil.validateDir(p);
+    shell.openPath(p);
+  };
+  spBtn.ondragenter = (e) => {
+    e.dataTransfer.dropEffect = "move";
+    spBtn.setAttribute("drag", "");
+    e.preventDefault();
+  };
+  spBtn.ondragover = (e) => {
+    e.preventDefault();
+  };
+  spBtn.ondragleave = (e) => {
+    spBtn.removeAttribute("drag");
+  };
 
-    spBtn.ondrop = e => {
-        spBtn.removeAttribute('drag')
-        e.preventDefault()
+  spBtn.ondrop = (e) => {
+    spBtn.removeAttribute("drag");
+    e.preventDefault();
 
-        DropinModUtil.addShaderpacks(e.dataTransfer.files, CACHE_SETTINGS_INSTANCE_DIR)
-        saveShaderpackSettings()
-        resolveShaderpacksForUI()
-    }
+    DropinModUtil.addShaderpacks(
+      e.dataTransfer.files,
+      CACHE_SETTINGS_INSTANCE_DIR
+    );
+    saveShaderpackSettings();
+    resolveShaderpacksForUI();
+  };
 }
 
 // Server status bar functions.
@@ -1053,10 +1170,12 @@ function bindShaderpackButton() {
 /**
  * Load the currently selected server information onto the mods tab.
  */
-function loadSelectedServerOnModsTab(){
-    const serv = DistroManager.getDistribution().getServer(ConfigManager.getSelectedServer())
+function loadSelectedServerOnModsTab() {
+  const serv = DistroManager.getDistribution().getServer(
+    ConfigManager.getSelectedServer()
+  );
 
-    document.getElementById('settingsSelServContent').innerHTML = `
+  document.getElementById("settingsSelServContent").innerHTML = `
         <img class="serverListingImg" src="${serv.getIcon()}"/>
         <div class="serverListingDetails">
             <span class="serverListingName">${serv.getName()}</span>
@@ -1064,7 +1183,9 @@ function loadSelectedServerOnModsTab(){
             <div class="serverListingInfo">
                 <div class="serverListingVersion">${serv.getMinecraftVersion()}</div>
                 <div class="serverListingRevision">${serv.getVersion()}</div>
-                ${serv.isMainServer() ? `<div class="serverListingStarWrapper">
+                ${
+                  serv.isMainServer()
+                    ? `<div class="serverListingStarWrapper">
                     <svg id="Layer_1" viewBox="0 0 107.45 104.74" width="20px" height="20px">
                         <defs>
                             <style>.cls-1{fill:#fff;}.cls-2{fill:none;stroke:#fff;stroke-miterlimit:10;}</style>
@@ -1073,50 +1194,54 @@ function loadSelectedServerOnModsTab(){
                         <circle class="cls-2" cx="53.73" cy="53.9" r="38"/>
                     </svg>
                     <span class="serverListingStarTooltip">Serveur Principal</span>
-                </div>` : ''}
+                </div>`
+                    : ""
+                }
             </div>
         </div>
-    `
+    `;
 }
 
 // Bind functionality to the server switch button.
-document.getElementById('settingsSwitchServerButton').addEventListener('click', (e) => {
-    e.target.blur()
-    toggleServerSelection(true)
-})
+document
+  .getElementById("settingsSwitchServerButton")
+  .addEventListener("click", (e) => {
+    e.target.blur();
+    toggleServerSelection(true);
+  });
 
 /**
  * Save mod configuration for the current selected server.
  */
-function saveAllModConfigurations(){
-    saveModConfiguration()
-    ConfigManager.save()
-    saveDropinModConfiguration()
+function saveAllModConfigurations() {
+  saveModConfiguration();
+  ConfigManager.save();
+  saveDropinModConfiguration();
 }
 
 /**
  * Function to refresh the mods tab whenever the selected
  * server is changed.
  */
-function animateModsTabRefresh(){
-    $('#settingsTabMods').fadeOut(500, () => {
-        prepareModsTab()
-        $('#settingsTabMods').fadeIn(500)
-    })
+function animateModsTabRefresh() {
+  $("#settingsTabMods").fadeOut(500, () => {
+    prepareModsTab();
+    $("#settingsTabMods").fadeIn(500);
+  });
 }
 
 /**
  * Prepare the Mods tab for display.
  */
-function prepareModsTab(first){
-    resolveModsForUI()
-    resolveDropinModsForUI()
-    resolveShaderpacksForUI()
-    bindDropinModsRemoveButton()
-    bindDropinModFileSystemButton()
-    bindShaderpackButton()
-    bindModsToggleSwitch()
-    loadSelectedServerOnModsTab()
+function prepareModsTab(first) {
+  resolveModsForUI();
+  resolveDropinModsForUI();
+  resolveShaderpacksForUI();
+  bindDropinModsRemoveButton();
+  bindDropinModFileSystemButton();
+  bindShaderpackButton();
+  bindModsToggleSwitch();
+  loadSelectedServerOnModsTab();
 }
 
 /**
@@ -1124,390 +1249,454 @@ function prepareModsTab(first){
  */
 
 // DOM Cache
-const settingsMaxRAMRange     = document.getElementById('settingsMaxRAMRange')
-const settingsMinRAMRange     = document.getElementById('settingsMinRAMRange')
-const settingsMaxRAMLabel     = document.getElementById('settingsMaxRAMLabel')
-const settingsMinRAMLabel     = document.getElementById('settingsMinRAMLabel')
-const settingsMemoryTotal     = document.getElementById('settingsMemoryTotal')
-const settingsMemoryAvail     = document.getElementById('settingsMemoryAvail')
-const settingsJavaExecDetails = document.getElementById('settingsJavaExecDetails')
+const settingsMaxRAMRange = document.getElementById("settingsMaxRAMRange");
+const settingsMinRAMRange = document.getElementById("settingsMinRAMRange");
+const settingsMaxRAMLabel = document.getElementById("settingsMaxRAMLabel");
+const settingsMinRAMLabel = document.getElementById("settingsMinRAMLabel");
+const settingsMemoryTotal = document.getElementById("settingsMemoryTotal");
+const settingsMemoryAvail = document.getElementById("settingsMemoryAvail");
+const settingsJavaExecDetails = document.getElementById(
+  "settingsJavaExecDetails"
+);
 
 // Store maximum memory values.
-const SETTINGS_MAX_MEMORY = ConfigManager.getAbsoluteMaxRAM()
-const SETTINGS_MIN_MEMORY = ConfigManager.getAbsoluteMinRAM()
+const SETTINGS_MAX_MEMORY = ConfigManager.getAbsoluteMaxRAM();
+const SETTINGS_MIN_MEMORY = ConfigManager.getAbsoluteMinRAM();
 
 // Set the max and min values for the ranged sliders.
-settingsMaxRAMRange.setAttribute('max', SETTINGS_MAX_MEMORY)
-settingsMaxRAMRange.setAttribute('min', SETTINGS_MIN_MEMORY)
-settingsMinRAMRange.setAttribute('max', SETTINGS_MAX_MEMORY)
-settingsMinRAMRange.setAttribute('min', SETTINGS_MIN_MEMORY )
+settingsMaxRAMRange.setAttribute("max", SETTINGS_MAX_MEMORY);
+settingsMaxRAMRange.setAttribute("min", SETTINGS_MIN_MEMORY);
+settingsMinRAMRange.setAttribute("max", SETTINGS_MAX_MEMORY);
+settingsMinRAMRange.setAttribute("min", SETTINGS_MIN_MEMORY);
 
 // Bind on change event for min memory container.
 settingsMinRAMRange.onchange = (e) => {
+  // Current range values
+  const sMaxV = Number(settingsMaxRAMRange.getAttribute("value"));
+  const sMinV = Number(settingsMinRAMRange.getAttribute("value"));
 
-    // Current range values
-    const sMaxV = Number(settingsMaxRAMRange.getAttribute('value'))
-    const sMinV = Number(settingsMinRAMRange.getAttribute('value'))
+  // Get reference to range bar.
+  const bar = e.target.getElementsByClassName("rangeSliderBar")[0];
+  // Calculate effective total memory.
+  const max = (os.totalmem() - 1000000000) / 1000000000;
 
-    // Get reference to range bar.
-    const bar = e.target.getElementsByClassName('rangeSliderBar')[0]
-    // Calculate effective total memory.
-    const max = (os.totalmem()-1000000000)/1000000000
+  // Change range bar color based on the selected value.
+  if (sMinV >= max / 2) {
+    bar.style.background = "#e86060";
+  } else if (sMinV >= max / 4) {
+    bar.style.background = "#e8e18b";
+  } else {
+    bar.style.background = null;
+  }
 
-    // Change range bar color based on the selected value.
-    if(sMinV >= max/2){
-        bar.style.background = '#e86060'
-    } else if(sMinV >= max/4) {
-        bar.style.background = '#e8e18b'
-    } else {
-        bar.style.background = null
-    }
+  // Increase maximum memory if the minimum exceeds its value.
+  if (sMaxV < sMinV) {
+    const sliderMeta = calculateRangeSliderMeta(settingsMaxRAMRange);
+    updateRangedSlider(
+      settingsMaxRAMRange,
+      sMinV,
+      ((sMinV - sliderMeta.min) / sliderMeta.step) * sliderMeta.inc
+    );
+    settingsMaxRAMLabel.innerHTML = sMinV.toFixed(1) + "G";
+  }
 
-    // Increase maximum memory if the minimum exceeds its value.
-    if(sMaxV < sMinV){
-        const sliderMeta = calculateRangeSliderMeta(settingsMaxRAMRange)
-        updateRangedSlider(settingsMaxRAMRange, sMinV,
-            ((sMinV-sliderMeta.min)/sliderMeta.step)*sliderMeta.inc)
-        settingsMaxRAMLabel.innerHTML = sMinV.toFixed(1) + 'G'
-    }
-
-    // Update label
-    settingsMinRAMLabel.innerHTML = sMinV.toFixed(1) + 'G'
-}
+  // Update label
+  settingsMinRAMLabel.innerHTML = sMinV.toFixed(1) + "G";
+};
 
 // Bind on change event for max memory container.
 settingsMaxRAMRange.onchange = (e) => {
-    // Current range values
-    const sMaxV = Number(settingsMaxRAMRange.getAttribute('value'))
-    const sMinV = Number(settingsMinRAMRange.getAttribute('value'))
+  // Current range values
+  const sMaxV = Number(settingsMaxRAMRange.getAttribute("value"));
+  const sMinV = Number(settingsMinRAMRange.getAttribute("value"));
 
-    // Get reference to range bar.
-    const bar = e.target.getElementsByClassName('rangeSliderBar')[0]
-    // Calculate effective total memory.
-    const max = (os.totalmem()-1000000000)/1000000000
+  // Get reference to range bar.
+  const bar = e.target.getElementsByClassName("rangeSliderBar")[0];
+  // Calculate effective total memory.
+  const max = (os.totalmem() - 1000000000) / 1000000000;
 
-    // Change range bar color based on the selected value.
-    if(sMaxV >= max/2){
-        bar.style.background = '#e86060'
-    } else if(sMaxV >= max/4) {
-        bar.style.background = '#e8e18b'
-    } else {
-        bar.style.background = null
-    }
+  // Change range bar color based on the selected value.
+  if (sMaxV >= max / 2) {
+    bar.style.background = "#e86060";
+  } else if (sMaxV >= max / 4) {
+    bar.style.background = "#e8e18b";
+  } else {
+    bar.style.background = null;
+  }
 
-    // Decrease the minimum memory if the maximum value is less.
-    if(sMaxV < sMinV){
-        const sliderMeta = calculateRangeSliderMeta(settingsMaxRAMRange)
-        updateRangedSlider(settingsMinRAMRange, sMaxV,
-            ((sMaxV-sliderMeta.min)/sliderMeta.step)*sliderMeta.inc)
-        settingsMinRAMLabel.innerHTML = sMaxV.toFixed(1) + 'G'
-    }
-    settingsMaxRAMLabel.innerHTML = sMaxV.toFixed(1) + 'G'
-}
+  // Decrease the minimum memory if the maximum value is less.
+  if (sMaxV < sMinV) {
+    const sliderMeta = calculateRangeSliderMeta(settingsMaxRAMRange);
+    updateRangedSlider(
+      settingsMinRAMRange,
+      sMaxV,
+      ((sMaxV - sliderMeta.min) / sliderMeta.step) * sliderMeta.inc
+    );
+    settingsMinRAMLabel.innerHTML = sMaxV.toFixed(1) + "G";
+  }
+  settingsMaxRAMLabel.innerHTML = sMaxV.toFixed(1) + "G";
+};
 
 /**
  * Calculate common values for a ranged slider.
- * 
- * @param {Element} v The range slider to calculate against. 
+ *
+ * @param {Element} v The range slider to calculate against.
  * @returns {Object} An object with meta values for the provided ranged slider.
  */
-function calculateRangeSliderMeta(v){
-    const val = {
-        max: Number(v.getAttribute('max')),
-        min: Number(v.getAttribute('min')),
-        step: Number(v.getAttribute('step')),
-    }
-    val.ticks = (val.max-val.min)/val.step
-    val.inc = 100/val.ticks
-    return val
+function calculateRangeSliderMeta(v) {
+  const val = {
+    max: Number(v.getAttribute("max")),
+    min: Number(v.getAttribute("min")),
+    step: Number(v.getAttribute("step")),
+  };
+  val.ticks = (val.max - val.min) / val.step;
+  val.inc = 100 / val.ticks;
+  return val;
 }
 
 /**
  * Binds functionality to the ranged sliders. They're more than
  * just divs now :').
  */
-function bindRangeSlider(){
-    Array.from(document.getElementsByClassName('rangeSlider')).map((v) => {
+function bindRangeSlider() {
+  Array.from(document.getElementsByClassName("rangeSlider")).map((v) => {
+    // Reference the track (thumb).
+    const track = v.getElementsByClassName("rangeSliderTrack")[0];
 
-        // Reference the track (thumb).
-        const track = v.getElementsByClassName('rangeSliderTrack')[0]
+    // Set the initial slider value.
+    const value = v.getAttribute("value");
+    const sliderMeta = calculateRangeSliderMeta(v);
 
-        // Set the initial slider value.
-        const value = v.getAttribute('value')
-        const sliderMeta = calculateRangeSliderMeta(v)
+    updateRangedSlider(
+      v,
+      value,
+      ((value - sliderMeta.min) / sliderMeta.step) * sliderMeta.inc
+    );
 
-        updateRangedSlider(v, value, ((value-sliderMeta.min)/sliderMeta.step)*sliderMeta.inc)
+    // The magic happens when we click on the track.
+    track.onmousedown = (e) => {
+      // Stop moving the track on mouse up.
+      document.onmouseup = (e) => {
+        document.onmousemove = null;
+        document.onmouseup = null;
+      };
 
-        // The magic happens when we click on the track.
-        track.onmousedown = (e) => {
+      // Move slider according to the mouse position.
+      document.onmousemove = (e) => {
+        // Distance from the beginning of the bar in pixels.
+        const diff = e.pageX - v.offsetLeft - track.offsetWidth / 2;
 
-            // Stop moving the track on mouse up.
-            document.onmouseup = (e) => {
-                document.onmousemove = null
-                document.onmouseup = null
-            }
+        // Don't move the track off the bar.
+        if (diff >= 0 && diff <= v.offsetWidth - track.offsetWidth / 2) {
+          // Convert the difference to a percentage.
+          const perc = (diff / v.offsetWidth) * 100;
+          // Calculate the percentage of the closest notch.
+          const notch =
+            Number(perc / sliderMeta.inc).toFixed(0) * sliderMeta.inc;
 
-            // Move slider according to the mouse position.
-            document.onmousemove = (e) => {
-
-                // Distance from the beginning of the bar in pixels.
-                const diff = e.pageX - v.offsetLeft - track.offsetWidth/2
-                
-                // Don't move the track off the bar.
-                if(diff >= 0 && diff <= v.offsetWidth-track.offsetWidth/2){
-
-                    // Convert the difference to a percentage.
-                    const perc = (diff/v.offsetWidth)*100
-                    // Calculate the percentage of the closest notch.
-                    const notch = Number(perc/sliderMeta.inc).toFixed(0)*sliderMeta.inc
-
-                    // If we're close to that notch, stick to it.
-                    if(Math.abs(perc-notch) < sliderMeta.inc/2){
-                        updateRangedSlider(v, sliderMeta.min+(sliderMeta.step*(notch/sliderMeta.inc)), notch)
-                    }
-                }
-            }
+          // If we're close to that notch, stick to it.
+          if (Math.abs(perc - notch) < sliderMeta.inc / 2) {
+            updateRangedSlider(
+              v,
+              sliderMeta.min + sliderMeta.step * (notch / sliderMeta.inc),
+              notch
+            );
+          }
         }
-    }) 
+      };
+    };
+  });
 }
 
 /**
  * Update a ranged slider's value and position.
- * 
+ *
  * @param {Element} element The ranged slider to update.
  * @param {string | number} value The new value for the ranged slider.
  * @param {number} notch The notch that the slider should now be at.
  */
-function updateRangedSlider(element, value, notch){
-    const oldVal = element.getAttribute('value')
-    const bar = element.getElementsByClassName('rangeSliderBar')[0]
-    const track = element.getElementsByClassName('rangeSliderTrack')[0]
-    
-    element.setAttribute('value', value)
+function updateRangedSlider(element, value, notch) {
+  const oldVal = element.getAttribute("value");
+  const bar = element.getElementsByClassName("rangeSliderBar")[0];
+  const track = element.getElementsByClassName("rangeSliderTrack")[0];
 
-    if(notch < 0){
-        notch = 0
-    } else if(notch > 100) {
-        notch = 100
-    }
+  element.setAttribute("value", value);
 
-    const event = new MouseEvent('change', {
-        target: element,
-        type: 'change',
-        bubbles: false,
-        cancelable: true
-    })
+  if (notch < 0) {
+    notch = 0;
+  } else if (notch > 100) {
+    notch = 100;
+  }
 
-    let cancelled = !element.dispatchEvent(event)
+  const event = new MouseEvent("change", {
+    target: element,
+    type: "change",
+    bubbles: false,
+    cancelable: true,
+  });
 
-    if(!cancelled){
-        track.style.left = notch + '%'
-        bar.style.width = notch + '%'
-    } else {
-        element.setAttribute('value', oldVal)
-    }
+  let cancelled = !element.dispatchEvent(event);
+
+  if (!cancelled) {
+    track.style.left = notch + "%";
+    bar.style.width = notch + "%";
+  } else {
+    element.setAttribute("value", oldVal);
+  }
 }
 
 /**
  * Display the total and available RAM.
  */
-function populateMemoryStatus(){
-    settingsMemoryTotal.innerHTML = Number((os.totalmem()-1000000000)/1000000000).toFixed(1) + 'G'
-    settingsMemoryAvail.innerHTML = Number(os.freemem()/1000000000).toFixed(1) + 'G'
+function populateMemoryStatus() {
+  settingsMemoryTotal.innerHTML =
+    Number((os.totalmem() - 1000000000) / 1000000000).toFixed(1) + "G";
+  settingsMemoryAvail.innerHTML =
+    Number(os.freemem() / 1000000000).toFixed(1) + "G";
 }
 
 /**
  * Validate the provided executable path and display the data on
  * the UI.
- * 
+ *
  * @param {string} execPath The executable path to populate against.
  */
-function populateJavaExecDetails(execPath){
-    const jg = new JavaGuard(DistroManager.getDistribution().getServer(ConfigManager.getSelectedServer()).getMinecraftVersion())
-    jg._validateJavaBinary(execPath).then(v => {
-        if(v.valid){
-            const vendor = v.vendor != null ? ` (${v.vendor})` : ''
-            if(v.version.major < 9) {
-                settingsJavaExecDetails.innerHTML = `Sélectionné: Java ${v.version.major} Update ${v.version.update} (x${v.arch})${vendor}`
-            } else {
-                settingsJavaExecDetails.innerHTML = `Sélectionné: Java ${v.version.major}.${v.version.minor}.${v.version.revision} (x${v.arch})${vendor}`
-            }
-        } else {
-            settingsJavaExecDetails.innerHTML = 'Sélection invalide'
-        }
-    })
+function populateJavaExecDetails(execPath) {
+  const jg = new JavaGuard(
+    DistroManager.getDistribution()
+      .getServer(ConfigManager.getSelectedServer())
+      .getMinecraftVersion()
+  );
+  jg._validateJavaBinary(execPath).then((v) => {
+    if (v.valid) {
+      const vendor = v.vendor != null ? ` (${v.vendor})` : "";
+      if (v.version.major < 9) {
+        settingsJavaExecDetails.innerHTML = `Sélectionné: Java ${v.version.major} Update ${v.version.update} (x${v.arch})${vendor}`;
+      } else {
+        settingsJavaExecDetails.innerHTML = `Sélectionné: Java ${v.version.major}.${v.version.minor}.${v.version.revision} (x${v.arch})${vendor}`;
+      }
+    } else {
+      settingsJavaExecDetails.innerHTML = "Sélection invalide";
+    }
+  });
 }
 
 /**
  * Prepare the Java tab for display.
  */
-function prepareJavaTab(){
-    bindRangeSlider()
-    populateMemoryStatus()
+function prepareJavaTab() {
+  bindRangeSlider();
+  populateMemoryStatus();
 }
 
 /**
  * About Tab
  */
 
-const settingsTabAbout             = document.getElementById('settingsTabAbout')
-const settingsAboutChangelogTitle  = settingsTabAbout.getElementsByClassName('settingsChangelogTitle')[0]
-const settingsAboutChangelogText   = settingsTabAbout.getElementsByClassName('settingsChangelogText')[0]
-const settingsAboutChangelogButton = settingsTabAbout.getElementsByClassName('settingsChangelogButton')[0]
+const settingsTabAbout = document.getElementById("settingsTabAbout");
+const settingsAboutChangelogTitle = settingsTabAbout.getElementsByClassName(
+  "settingsChangelogTitle"
+)[0];
+const settingsAboutChangelogText = settingsTabAbout.getElementsByClassName(
+  "settingsChangelogText"
+)[0];
+const settingsAboutChangelogButton = settingsTabAbout.getElementsByClassName(
+  "settingsChangelogButton"
+)[0];
 
 // Bind the devtools toggle button.
-document.getElementById('settingsAboutDevToolsButton').onclick = (e) => {
-    let window = remote.getCurrentWindow()
-    window.toggleDevTools()
-}
+document.getElementById("settingsAboutDevToolsButton").onclick = (e) => {
+  let window = remote.getCurrentWindow();
+  window.toggleDevTools();
+};
 
 /**
  * Return whether or not the provided version is a prerelease.
- * 
+ *
  * @param {string} version The semver version to test.
  * @returns {boolean} True if the version is a prerelease, otherwise false.
  */
-function isPrerelease(version){
-    const preRelComp = semver.prerelease(version)
-    return preRelComp != null && preRelComp.length > 0
+function isPrerelease(version) {
+  const preRelComp = semver.prerelease(version);
+  return preRelComp != null && preRelComp.length > 0;
 }
 
 /**
  * Utility method to display version information on the
  * About and Update settings tabs.
- * 
+ *
  * @param {string} version The semver version to display.
  * @param {Element} valueElement The value element.
  * @param {Element} titleElement The title element.
  * @param {Element} checkElement The check mark element.
  */
-function populateVersionInformation(version, valueElement, titleElement, checkElement){
-    valueElement.innerHTML = version
-    if(isPrerelease(version)){
-        titleElement.innerHTML = 'Pre-release'
-        titleElement.style.color = '#ff886d'
-        checkElement.style.background = '#ff886d'
-    } else {
-        titleElement.innerHTML = 'Stable Release'
-        titleElement.style.color = null
-        checkElement.style.background = null
-    }
+function populateVersionInformation(
+  version,
+  valueElement,
+  titleElement,
+  checkElement
+) {
+  valueElement.innerHTML = version;
+  if (isPrerelease(version)) {
+    titleElement.innerHTML = "Pre-release";
+    titleElement.style.color = "#ff886d";
+    checkElement.style.background = "#ff886d";
+  } else {
+    titleElement.innerHTML = "Stable Release";
+    titleElement.style.color = null;
+    checkElement.style.background = null;
+  }
 }
 
 /**
  * Retrieve the version information and display it on the UI.
  */
-function populateAboutVersionInformation(){
-    populateVersionInformation(remote.app.getVersion(), document.getElementById('settingsAboutCurrentVersionValue'), document.getElementById('settingsAboutCurrentVersionTitle'), document.getElementById('settingsAboutCurrentVersionCheck'))
+function populateAboutVersionInformation() {
+  populateVersionInformation(
+    remote.app.getVersion(),
+    document.getElementById("settingsAboutCurrentVersionValue"),
+    document.getElementById("settingsAboutCurrentVersionTitle"),
+    document.getElementById("settingsAboutCurrentVersionCheck")
+  );
 }
 
 /**
  * Fetches the GitHub atom release feed and parses it for the release notes
  * of the current version. This value is displayed on the UI.
  */
-function populateReleaseNotes(){
-    $.ajax({
-        url: 'https://github.com/LucasB25/HuntingZ_Launcher/releases.atom',
-        success: (data) => {
-            const version = 'v' + remote.app.getVersion()
-            const entries = $(data).find('entry')
-            
-            for(let i=0; i<entries.length; i++){
-                const entry = $(entries[i])
-                let id = entry.find('id').text()
-                id = id.substring(id.lastIndexOf('/')+1)
+function populateReleaseNotes() {
+  $.ajax({
+    url: "https://github.com/LucasB25/HuntingZ_Launcher/releases.atom",
+    success: (data) => {
+      const version = "v" + remote.app.getVersion();
+      const entries = $(data).find("entry");
 
-                if(id === version){
-                    settingsAboutChangelogTitle.innerHTML = entry.find('title').text()
-                    settingsAboutChangelogText.innerHTML = entry.find('content').text()
-                    settingsAboutChangelogButton.href = entry.find('link').attr('href')
-                }
-            }
+      for (let i = 0; i < entries.length; i++) {
+        const entry = $(entries[i]);
+        let id = entry.find("id").text();
+        id = id.substring(id.lastIndexOf("/") + 1);
 
-        },
-        timeout: 2500
-    }).catch(err => {
-        settingsAboutChangelogText.innerHTML = 'Échec du chargement des notes de version.'
-    })
+        if (id === version) {
+          settingsAboutChangelogTitle.innerHTML = entry.find("title").text();
+          settingsAboutChangelogText.innerHTML = entry.find("content").text();
+          settingsAboutChangelogButton.href = entry.find("link").attr("href");
+        }
+      }
+    },
+    timeout: 2500,
+  }).catch((err) => {
+    settingsAboutChangelogText.innerHTML =
+      "Échec du chargement des notes de version.";
+  });
 }
 
 /**
  * Prepare account tab for display.
  */
-function prepareAboutTab(){
-    populateAboutVersionInformation()
-    populateReleaseNotes()
+function prepareAboutTab() {
+  populateAboutVersionInformation();
+  populateReleaseNotes();
 }
 
 /**
  * Update Tab
  */
 
-const settingsTabUpdate            = document.getElementById('settingsTabUpdate')
-const settingsUpdateTitle          = document.getElementById('settingsUpdateTitle')
-const settingsUpdateVersionCheck   = document.getElementById('settingsUpdateVersionCheck')
-const settingsUpdateVersionTitle   = document.getElementById('settingsUpdateVersionTitle')
-const settingsUpdateVersionValue   = document.getElementById('settingsUpdateVersionValue')
-const settingsUpdateChangelogTitle = settingsTabUpdate.getElementsByClassName('settingsChangelogTitle')[0]
-const settingsUpdateChangelogText  = settingsTabUpdate.getElementsByClassName('settingsChangelogText')[0]
-const settingsUpdateChangelogCont  = settingsTabUpdate.getElementsByClassName('settingsChangelogContainer')[0]
-const settingsUpdateActionButton   = document.getElementById('settingsUpdateActionButton')
+const settingsTabUpdate = document.getElementById("settingsTabUpdate");
+const settingsUpdateTitle = document.getElementById("settingsUpdateTitle");
+const settingsUpdateVersionCheck = document.getElementById(
+  "settingsUpdateVersionCheck"
+);
+const settingsUpdateVersionTitle = document.getElementById(
+  "settingsUpdateVersionTitle"
+);
+const settingsUpdateVersionValue = document.getElementById(
+  "settingsUpdateVersionValue"
+);
+const settingsUpdateChangelogTitle = settingsTabUpdate.getElementsByClassName(
+  "settingsChangelogTitle"
+)[0];
+const settingsUpdateChangelogText = settingsTabUpdate.getElementsByClassName(
+  "settingsChangelogText"
+)[0];
+const settingsUpdateChangelogCont = settingsTabUpdate.getElementsByClassName(
+  "settingsChangelogContainer"
+)[0];
+const settingsUpdateActionButton = document.getElementById(
+  "settingsUpdateActionButton"
+);
 
 /**
  * Update the properties of the update action button.
- * 
+ *
  * @param {string} text The new button text.
  * @param {boolean} disabled Optional. Disable or enable the button
  * @param {function} handler Optional. New button event handler.
  */
-function settingsUpdateButtonStatus(text, disabled = false, handler = null){
-    settingsUpdateActionButton.innerHTML = text
-    settingsUpdateActionButton.disabled = disabled
-    if(handler != null){
-        settingsUpdateActionButton.onclick = handler
-    }
+function settingsUpdateButtonStatus(text, disabled = false, handler = null) {
+  settingsUpdateActionButton.innerHTML = text;
+  settingsUpdateActionButton.disabled = disabled;
+  if (handler != null) {
+    settingsUpdateActionButton.onclick = handler;
+  }
 }
 
 /**
  * Populate the update tab with relevant information.
- * 
+ *
  * @param {Object} data The update data.
  */
-function populateSettingsUpdateInformation(data){
-    if(data != null){
-        settingsUpdateTitle.innerHTML = `Nouvelle version ${isPrerelease(data.version) ? 'Beta' : 'Stable'} disponible !`
-        settingsUpdateChangelogCont.style.display = null
-        settingsUpdateChangelogTitle.innerHTML = data.releaseName
-        settingsUpdateChangelogText.innerHTML = data.releaseNotes
-        populateVersionInformation(data.version, settingsUpdateVersionValue, settingsUpdateVersionTitle, settingsUpdateVersionCheck)
-        
-        if(process.platform === 'darwin'){
-            settingsUpdateButtonStatus('Télécharger depuis GitHub<span style="font-size: 10px;color: gray;text-shadow: none !important;">Fermez le lanceur et exécutez le dmg pour mettre à jour.</span>', false, () => {
-                shell.openExternal(data.darwindownload)
-            })
-        } else {
-            settingsUpdateButtonStatus('Téléchargement..', true)
+function populateSettingsUpdateInformation(data) {
+  if (data != null) {
+    settingsUpdateTitle.innerHTML = `Nouvelle version ${
+      isPrerelease(data.version) ? "Beta" : "Stable"
+    } disponible !`;
+    settingsUpdateChangelogCont.style.display = null;
+    settingsUpdateChangelogTitle.innerHTML = data.releaseName;
+    settingsUpdateChangelogText.innerHTML = data.releaseNotes;
+    populateVersionInformation(
+      data.version,
+      settingsUpdateVersionValue,
+      settingsUpdateVersionTitle,
+      settingsUpdateVersionCheck
+    );
+
+    if (process.platform === "darwin") {
+      settingsUpdateButtonStatus(
+        'Télécharger depuis GitHub<span style="font-size: 10px;color: gray;text-shadow: none !important;">Fermez le lanceur et exécutez le dmg pour mettre à jour.</span>',
+        false,
+        () => {
+          shell.openExternal(data.darwindownload);
         }
+      );
     } else {
-        settingsUpdateTitle.innerHTML = 'Vous utilisez la dernière version'
-        settingsUpdateChangelogCont.style.display = 'none'
-        populateVersionInformation(remote.app.getVersion(), settingsUpdateVersionValue, settingsUpdateVersionTitle, settingsUpdateVersionCheck)
-        settingsUpdateButtonStatus('Vérifier les mises à jour', false, () => {
-            if(!isDev){
-                ipcRenderer.send('autoUpdateAction', 'checkForUpdate')
-                settingsUpdateButtonStatus('Vérification des mises à jour..', true)
-            }
-        })
+      settingsUpdateButtonStatus("Téléchargement..", true);
     }
+  } else {
+    settingsUpdateTitle.innerHTML = "Vous utilisez la dernière version";
+    settingsUpdateChangelogCont.style.display = "none";
+    populateVersionInformation(
+      remote.app.getVersion(),
+      settingsUpdateVersionValue,
+      settingsUpdateVersionTitle,
+      settingsUpdateVersionCheck
+    );
+    settingsUpdateButtonStatus("Vérifier les mises à jour", false, () => {
+      if (!isDev) {
+        ipcRenderer.send("autoUpdateAction", "checkForUpdate");
+        settingsUpdateButtonStatus("Vérification des mises à jour..", true);
+      }
+    });
+  }
 }
 
 /**
  * Prepare update tab for display.
- * 
+ *
  * @param {Object} data The update data.
  */
-function prepareUpdateTab(data = null){
-    populateSettingsUpdateInformation(data)
+function prepareUpdateTab(data = null) {
+  populateSettingsUpdateInformation(data);
 }
 
 /**
@@ -1515,22 +1704,22 @@ function prepareUpdateTab(data = null){
  */
 
 /**
-  * Prepare the entire settings UI.
-  * 
-  * @param {boolean} first Whether or not it is the first load.
-  */
+ * Prepare the entire settings UI.
+ *
+ * @param {boolean} first Whether or not it is the first load.
+ */
 function prepareSettings(first = false) {
-    if(first){
-        setupSettingsTabs()
-        initSettingsValidators()
-        prepareUpdateTab()
-    } else {
-        prepareModsTab()
-    }
-    initSettingsValues()
-    prepareAccountsTab()
-    prepareJavaTab()
-    prepareAboutTab()
+  if (first) {
+    setupSettingsTabs();
+    initSettingsValidators();
+    prepareUpdateTab();
+  } else {
+    prepareModsTab();
+  }
+  initSettingsValues();
+  prepareAccountsTab();
+  prepareJavaTab();
+  prepareAboutTab();
 }
 
 // Prepare the settings UI on startup.
