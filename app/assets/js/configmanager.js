@@ -57,7 +57,7 @@ const firstLaunch =
 
 exports.getAbsoluteMinRAM = function () {
   const mem = os.totalmem();
-  return mem >= 6000000000 ? 3 : 2;
+  return mem >= 4000000000 ? 2 : 3;
 };
 
 exports.getAbsoluteMaxRAM = function () {
@@ -73,7 +73,7 @@ exports.getAbsoluteMaxRAM = function () {
 
 function resolveMaxRAM() {
   const mem = os.totalmem();
-  return mem >= 8000000000 ? "4G" : mem >= 6000000000 ? "3G" : "2G";
+  return mem >= 4000000000 ? "2G" : mem >= 4000000000 ? "2G" : "3G";
 }
 
 function resolveMinRAM() {
