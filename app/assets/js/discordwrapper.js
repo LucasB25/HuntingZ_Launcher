@@ -44,6 +44,11 @@ exports.initRPC = function (
   });
 };
 
+exports.resetTime = function () {
+  activity.startTimestamp = new Date().getTime();
+  client.setActivity(activity);
+};
+
 exports.updateDetails = function (details) {
   activity.details = details;
   client.setActivity(activity);

@@ -76,10 +76,6 @@ function resolveMaxRAM() {
   return mem >= 8000000000 ? "4G" : mem >= 6000000000 ? "3G" : "2G";
 }
 
-function resolveMinRAM() {
-  return resolveMaxRAM();
-}
-
 /**
  * Three types of values:
  * Static = Explicitly declared.
@@ -89,14 +85,16 @@ function resolveMinRAM() {
 const DEFAULT_CONFIG = {
   settings: {
     java: {
-      minRAM: resolveMinRAM(),
+      minRAM: "2G",
       maxRAM: resolveMaxRAM(), // Dynamic
       executable: null,
       jvmOptions: [
-        "-XX:+UseConcMarkSweepGC",
-        "-XX:+CMSIncrementalMode",
-        "-XX:-UseAdaptiveSizePolicy",
-        "-Xmn128M",
+        "-XX:+UnlockExperimentalVMOptions",
+        "-XX:+UseG1GC",
+        "-XX:G1NewSizePercent=20",
+        "-XX:G1ReservePercent=20",
+        "-XX:MaxGCPauseMillis=50",
+        "-XX:G1HeapRegionSize=32M",
       ],
     },
     game: {
