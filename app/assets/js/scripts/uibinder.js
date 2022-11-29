@@ -19,7 +19,6 @@ const VIEWS = {
   loginOptions: "#loginOptionsContainer",
   login: "#loginContainer",
   settings: "#settingsContainer",
-  welcome: "#welcomeContainer",
   waiting: "#waitingContainer",
 };
 
