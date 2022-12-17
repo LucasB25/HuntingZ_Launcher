@@ -243,6 +243,7 @@
                   id="settingsMaxRAMRange"
                   class="rangeSlider"
                   cValue="MaxRAM"
+                  serverDependent
                   min="2"
                   max="16"
                   value="2"
@@ -252,7 +253,7 @@
                   <div class="rangeSliderTrack"></div>
                 </div>
                 <span id="settingsMaxRAMLabel" class="settingsMemoryLabel"
-                  >3G</span
+                  >2G</span
                 >
               </div>
             </div>
@@ -263,6 +264,7 @@
                   id="settingsMinRAMRange"
                   class="rangeSlider"
                   cValue="MinRAM"
+                  serverDependent
                   min="3"
                   max="16"
                   value="3"
@@ -272,12 +274,12 @@
                   <div class="rangeSliderTrack"></div>
                 </div>
                 <span id="settingsMinRAMLabel" class="settingsMemoryLabel"
-                  >3G</span
+                  >2G</span
                 >
               </div>
             </div>
             <div id="settingsMemoryDesc">
-              La RAM minimale recommandée est de 3GO. Le fait de définir les
+              La RAM minimale recommandée est de 2GO. Le fait de définir les
               valeurs minimale et maximale sur la même valeur peut réduire le
               décalage.
             </div>
@@ -348,6 +350,7 @@
               type="text"
               value="null"
               cValue="JavaExecutable"
+              serverDependent
               disabled
             />
             <button
@@ -362,8 +365,8 @@
         </div>
         <div class="settingsFileSelDesc">
           L'exécutable Java est validé avant le lancement du jeu.
-          <strong>Nécessite Java 8 x64.</strong><br />Le chemin doit se terminer
-          par
+          <strong id="settingsJavaReqDesc">Nécessite Java 8 x64.</strong
+          ><br />Le chemin doit se terminer par
           <strong
             >bin<%= process.platform === 'win32' ? '\\javaw.exe' : '/java'
             %></strong
@@ -408,12 +411,18 @@
               </g>
             </svg>
           </div>
-          <input id="settingsJVMOptsVal" cValue="JVMOptions" type="text" />
+          <input
+            id="settingsJVMOptsVal"
+            cValue="JVMOptions"
+            serverDependent
+            type="text"
+          />
         </div>
         <div id="settingsJVMOptsDesc">
           Options à fournir à la JVM au moment de l'exécution. <em>-Xms</em> et
           <em>-Xmx</em> ne doivent pas être inclus.<br /><a
             href="https://docs.oracle.com/javase/8/docs/technotes/tools/<%= process.platform === 'win32' ? 'windows' : 'unix' %>/java.html"
+            id="settingsJvmOptsLink"
             >Options disponibles pour Java 8</a
           >.
         </div>
