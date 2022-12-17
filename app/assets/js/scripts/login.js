@@ -220,6 +220,9 @@ loginButton.addEventListener("click", () => {
         };
       }
 
+      $('.abc').show()
+      $('.abc').delay(1000*7).fadeOut();
+
       setOverlayContent(
         actualDisplayableError.title,
         actualDisplayableError.desc,
