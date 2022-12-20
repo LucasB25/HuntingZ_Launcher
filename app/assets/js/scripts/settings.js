@@ -144,8 +144,8 @@ function initSettingsValues() {
         if (v.type === "number" || v.type === "text") {
           // Special Conditions
           if (cVal === "JavaExecutable") {
-            populateJavaExecDetails(v.value);
             v.value = gFn();
+            populateJavaExecDetails(v.value);
           } else if (cVal === "DataDirectory") {
             v.value = gFn();
           } else if (cVal === "JVMOptions") {
@@ -992,6 +992,25 @@ function bindDropinModsRemoveButton() {
  * Bind functionality to the file system button for the selected
  * server configuration.
  */
+
+function bindLogsButton() {
+  const spBtn = document.getElementById("FindLogsButton");
+  spBtn.onclick = () => {
+    const p = path.join(CACHE_SETTINGS_INSTANCE_DIR, "logs");
+    DropinModUtil.validateDir(p);
+    shell.openPath(p);
+  };
+}
+
+function bindCrashReportButton() {
+  const spBtn = document.getElementById("FindCrashreportButton");
+  spBtn.onclick = () => {
+    const p = path.join(CACHE_SETTINGS_INSTANCE_DIR, "crash-reports");
+    DropinModUtil.validateDir(p);
+    shell.openPath(p);
+  };
+}
+
 function bindDropinModFileSystemButton() {
   const fsBtn = document.getElementById("settingsDropinFileSystemButton");
   fsBtn.onclick = () => {
@@ -1240,6 +1259,8 @@ function prepareModsTab(first) {
   resolveShaderpacksForUI();
   bindDropinModsRemoveButton();
   bindDropinModFileSystemButton();
+  bindCrashReportButton();
+  bindLogsButton();
   bindShaderpackButton();
   bindModsToggleSwitch();
   loadSelectedServerOnModsTab();

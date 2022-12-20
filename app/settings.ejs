@@ -365,8 +365,10 @@
         </div>
         <div class="settingsFileSelDesc">
           L'exécutable Java est validé avant le lancement du jeu.
-          <strong id="settingsJavaReqDesc">Nécessite Java 8 x64.</strong
-          ><br />Le chemin doit se terminer par
+
+          <a href="https://www.java.com/fr/download/" id="settingsJavaReqDesc"
+            >Nécessite Java 8 x64</a
+          >.<br />Le chemin doit se terminer par
           <strong
             >bin<%= process.platform === 'win32' ? '\\javaw.exe' : '/java'
             %></strong
@@ -526,8 +528,6 @@
           </div>
         </div>
         <div id="settingsAboutButtons">
-          <!-- The following must be included in third-party usage. -->
-          <!-- <a href="https://github.com/dscalzi/HeliosLauncher" id="settingsAboutSourceButton" class="settingsAboutButton">Original Source</a> -->
           <a
             href="https://discord.gg/DqPxskbjCx"
             id="settingsAboutSupportButton"
@@ -540,15 +540,10 @@
             class="settingsAboutButton"
             >DevTools Console</a
           >
-        </div>
-      </div>
-      <div class="settingsChangelogContainer">
-        <div class="settingsChangelogContent">
-          <div class="settingsChangelogHeadline">
-            <div class="settingsChangelogLabel">Notes de mise à jour</div>
-            <div class="settingsChangelogTitle">Changelog</div>
-          </div>
-          <div class="settingsChangelogText">Pas de notes de mise à jour</div>
+          <button id="FindCrashreportButton" class="settingsAboutButton">
+            Crash-report
+          </button>
+          <button id="FindLogsButton" class="settingsAboutButton">Logs</button>
         </div>
       </div>
     </div>

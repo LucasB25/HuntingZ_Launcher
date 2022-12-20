@@ -88,14 +88,19 @@ const DEFAULT_CONFIG = {
       minRAM: "2G",
       maxRAM: resolveMaxRAM(), // Dynamic
       executable: null,
-      jvmOptions: [],
+      jvmOptions: [
+        "-XX:+UseConcMarkSweepGC",
+        "-XX:+CMSIncrementalMode",
+        "-XX:-UseAdaptiveSizePolicy",
+        "-Xmn128M",
+      ],
     },
     game: {
       resWidth: 1280,
       resHeight: 720,
       fullscreen: false,
       autoConnect: true,
-      launchDetached: false,
+      launchDetached: true,
     },
     launcher: {
       allowPrerelease: false,
