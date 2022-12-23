@@ -333,7 +333,7 @@ function createMenu() {
       ],
     };
 
-    // New edit menu adds support for text-editing keyboard shortcuts
+    //New edit menu adds support for text-editing keyboard shortcuts
     let editSubMenu = {
       label: "Edit",
       submenu: [
