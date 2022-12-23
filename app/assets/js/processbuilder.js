@@ -115,6 +115,16 @@ class ProcessBuilder {
   }
 
   /**
+   * Get the platform specific classpath separator. On windows, this is a semicolon.
+   * On Unix, this is a colon.
+   *
+   * @returns {string} The classpath separator for the current operating system.
+   */
+  static getClasspathSeparator() {
+    return process.platform === "win32" ? ";" : ":";
+  }
+
+  /**
    * Determine if an optional mod is enabled from its configuration value. If the
    * configuration value is null, the required object will be used to
    * determine if it is enabled.
@@ -390,7 +400,7 @@ class ProcessBuilder {
     args.push("-cp");
     args.push(
       this.classpathArg(mods, tempNativePath).join(
-        process.platform === "win32" ? ";" : ":"
+        ProcessBuilder.getClasspathSeparator()
       )
     );
 
@@ -430,6 +440,23 @@ class ProcessBuilder {
 
     // JVM Arguments First
     let args = this.versionData.arguments.jvm;
+
+    // Debug securejarhandler
+    // args.push('-Dbsl.debug=true')
+
+    if (this.forgeData.arguments.jvm != null) {
+      for (const argStr of this.forgeData.arguments.jvm) {
+        args.push(
+          argStr
+            .replaceAll("${library_directory}", this.libPath)
+            .replaceAll(
+              "${classpath_separator}",
+              ProcessBuilder.getClasspathSeparator()
+            )
+            .replaceAll("${version_name}", this.forgeData.id)
+        );
+      }
+    }
 
     //args.push('-Dlog4j.configurationFile=D:\\WesterosCraft\\game\\common\\assets\\log_configs\\client-1.12.xml')
 
@@ -547,7 +574,7 @@ class ProcessBuilder {
               break;
             case "classpath":
               val = this.classpathArg(mods, tempNativePath).join(
-                process.platform === "win32" ? ";" : ":"
+                ProcessBuilder.getClasspathSeparator()
               );
               break;
           }
@@ -867,6 +894,20 @@ class ProcessBuilder {
     let libs = [];
     for (let sm of mdl.getSubModules()) {
       if (sm.getType() === DistroManager.Types.Library) {
+        // TODO Add as file or something.
+        const x = sm.getIdentifier();
+        console.log(x);
+        if (
+          x.includes(":universal") ||
+          x.includes(":slim") ||
+          x.includes(":extra") ||
+          x.includes(":srg") ||
+          x.includes(":client")
+        ) {
+          console.log("SKIPPING " + x);
+          continue;
+        }
+
         libs.push(sm.getArtifact().getPath());
       }
       // If this module has submodules, we need to resolve the libraries for those.
